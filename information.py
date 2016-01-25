@@ -53,8 +53,21 @@ class Information:
     return cls(yaml_ordered_load(txt))
 
 
+  @classmethod
+  def from_string(cls, text):
+    return cls(yaml_ordered_load(text))
+
+
+
+
+
+
   def __str__(self):
     return '\n'.join('{}: {}'.format(k, v) for k, v in self.content.items())
+
+
+
+
 
 
 
@@ -76,3 +89,52 @@ def test_info_yaml():
   print(str(info))
   info = Information.from_yaml(os.getcwd() + '/test/测试单位ansi.inf')
   print(str(info))
+
+
+
+def test_info_string():
+
+  text = '''
+  单位名称: 测试单位ANSI
+  项目名称: 测试项目
+  项目编号: 2015-项目编号-009
+  面积90: 10000.1100
+  面积80: 20000.22
+  面积80: .1
+  地籍号: 1234567890010010000
+  四至: 测试路1;测试街2;测试路3;测试街4
+  土地坐落: 测试路以东,测试街以南
+
+  '''
+  info = Information.from_string(text)
+  print(str(info))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def test_figlet():
+
+  from pylon import generate_figlet
+
+  generate_figlet('excelfiller', fonts=['space_op', ])
+  generate_figlet('wordfiller', fonts=['space_op', ])
+  generate_figlet('autocadfiller', fonts=['space_op', ])
+
+
+
+def test_mkdir():
+  import os
+  os.mkdir('33/11/22')
+
+
+
