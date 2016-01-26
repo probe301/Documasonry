@@ -1,4 +1,4 @@
-﻿
+
 from pylon import AutoDelegator
 from pylon import puts
 import re
@@ -6,12 +6,16 @@ import os
 from pylon import dedupe
 import win32com.client
 from jinja2 import Template
+from jinja2 import meta
+from jinja2 import Environment
 
-
+from pylon import datalines
 
 def extract_field(field):
   # {{name | lower}}
-  return field[2:-2].split('|')[0].strip()
+  # return field[2:-2].split('|')[0].strip()
+  ast = Environment().parse(field)
+  return meta.find_undeclared_variables(ast)
 
 
 def evalute_field(field, info):
@@ -161,7 +165,10 @@ class WordFiller:
       self.document.Close()
 
     if unique:
-      return list(dedupe(extract_field(name) for name in field_names))
+      unique_names = []
+      for name in field_names:
+        unique_names.extend(extract_field(name))
+      return list(dedupe(unique_names))
     else:
       return field_names
 
@@ -253,17 +260,17 @@ def test_word_filler_render():
   from information import Information
 
   text = '''
-  单位名称: 测试单位ANSI
+  单位名称: 测试单位
+  name: 测试单位name
   项目名称: 测试项目
-  项目编号: 2015-项目编号-009
-  面积90: 10099.900
-  area90: 20000.22
-  area80: 30000.33
-  面积80: 10088.8000
+  项目编号: 2015-项目编号-001
+  面积90: 12345.600
+  面积80: 12345.300
   地籍号: 1234567890010010000
   四至: 测试路1;测试街2;测试路3;测试街4
   土地坐落: 测试路以东,测试街以南
-  name: 测试单位ANSI
+  area: 1000
+  已设定值: value
   '''
 
   info = Information.from_string(text)
@@ -278,6 +285,69 @@ def test_word_filler_render():
 
 
 
+
+
+
+
+
+def test_jinja():
+
+
+  from information import Information
+
+  text = '''
+  单位名称: 测试单位
+  项目名称: 测试项目
+  项目编号: 2015-项目编号-001
+  面积90: 12345.600
+  面积80: 12345.300
+  地籍号: 1234567890010010000
+  四至: 测试路1;测试街2;测试路3;测试街4
+  土地坐落: 测试路以东,测试街以南
+  area: 1000
+  已设定值: value
+  '''
+  info = Information.from_string(text)
+
+
+
+
+  template = '''
+  title
+  {{单位名称}}                           -> 测试单位
+  {{100 - 98}}                           -> 2
+  {{'%.2f' | format(面积90 - 面积80)}}   -> 0.30
+  {{面积80|round(1)}}                    -> 12345.3
+
+  {{'%.2f'| format(area)}}               -> 1000.00
+  {{'%.1f'| format(area)}}               -> 1000.0
+  {{'%.4f'| format(area)}}               -> 1000.0000
+  {{ "Hello " ~ 单位名称 ~ " !" }}        -> Hello 测试单位 !
+
+  {{ "Hello World"|replace("Hello", "Goodbye") }} -> Goodbye World
+  {{ "aaaaargh"|replace("a", "d'oh, ", 2) }} -> d'oh, d'oh, aaargh
+  {{area}}
+  {area}
+  {{未设定值|d(default_value='default')}}  -> default
+  {{已设定值|d(default_value='default')}}  -> value
+
+  {{四至|truncate(12, killwords=True)}}  -> 测试路1;测试街2;测试...
+
+
+
+
+
+  '''
+
+  t = Template(template)
+  result = t.render(**info.content)
+  for line in datalines(result):
+    if '->' in line:
+      rendered, spec = line.split('->')
+      if rendered.strip() != spec.strip():
+        print('! ', line)
+
+  # filler.save(folder='path/to/', close=True)
 
 
 
