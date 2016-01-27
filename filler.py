@@ -8,7 +8,7 @@ import win32com.client
 from jinja2 import Template
 from jinja2 import meta
 from jinja2 import Environment
-
+import time
 from pylon import datalines
 
 def extract_field(field):
@@ -117,6 +117,8 @@ class Filler(AutoDelegator):
 class NoInfoKeyError(Exception):
   pass
 
+class SaveDocumentError(Exception):
+  pass
 
 
 
@@ -140,12 +142,11 @@ class WordFiller:
   def __init__(self, template_path, app):
     self.template_path = template_path
     self.app = app
-
+    self.document = self.app.Documents.Open(self.template_path)
 
 
   def detect_required_fields(self, close=True, unique=False):
 
-    self.document = self.app.Documents.Open(self.template_path)
     self.app.Selection.HomeKey(6)
     text_range = self.document.Content
     text = "\{\{*\}\}"
@@ -176,6 +177,7 @@ class WordFiller:
 
 
   def render(self, info):
+    self.info = info
     self.app.Visible = True
     for field in self.detect_required_fields(close=False, unique=False):
       self.app.Selection.HomeKey(6)
@@ -187,43 +189,34 @@ class WordFiller:
 
 
       while text_range.Find.Execute(field, False, False, False, False, False, True, 0, True, val, 2):
-      # 'Replace' => 0 no replace ?
-      # 'Replace' => 1 replace once ?
-      # 'Replace' => 2 replace all ?
+        # 'Replace' => 0 no replace ?
+        # 'Replace' => 1 replace once ?
+        # 'Replace' => 2 replace all ?
         # self.record('replace done {} ---> {}'.format(field.raw, val))
         pass
       # print(field_names)
-    # self.record('all fields replace done')
-      # w.Selection.Find.Execute(OldStr, False, False, False, False, False, True, 1, True, NewStr, 2)
 
 
 
   def save(self, folder, close=True):
-    pass
 
+    output_name = evalute_field(os.path.basename(self.template_path), self.info)
+    output_path = os.path.join(folder, output_name)
 
-
-
-  def save(self, close=True):
-    output_name = self.output_name
-    # print(tmpl_name)
-    workspace = self.workspace
-    if (workspace[-1] == '/' or workspace[-1] == '\\'):
-      self.output_path = workspace + output_name
-    else:
-      self.output_path = workspace + '/' + output_name
-
-    # print('!!',self.output_path)
-    if os.path.exists(self.output_path):
-      fix = time.strftime('.backup-%Y-%m-%d-%H%M%S')
-      os.rename(self.output_path, fix.join(os.path.splitext(self.output_path)))
+    if os.path.exists(output_path):
+      fix = time.strftime('.backup-%Y%m%d-%H%M%S')
+      os.rename(output_path, fix.join(os.path.splitext(output_path)))
     try:
-      self.document.SaveAs(self.output_path)
-    except Exception as e:
-      self.record('Word Filler can not save document: <{}>'.format(self.output_path), important=True)
+      self.document.SaveAs(output_path)
+    except Exception:
+      t = 'Word Filler can not save document: <{}>'.format(output_path)
+      raise SaveDocumentError(t)
+
     if close:
       self.document.Close()
-    # self.record('成功填充了文档 <{}>: \n  <{}>'.format(self.output_name, self.output_path), important=True)
+
+
+
 
 
 
@@ -260,17 +253,17 @@ def test_word_filler_render():
   from information import Information
 
   text = '''
-  单位名称: 测试单位
-  name: 测试单位name
-  项目名称: 测试项目
-  项目编号: 2015-项目编号-001
-  面积90: 12345.600
-  面积80: 12345.300
-  地籍号: 1234567890010010000
-  四至: 测试路1;测试街2;测试路3;测试街4
-  土地坐落: 测试路以东,测试街以南
-  area: 1000
-  已设定值: value
+    单位名称: 测试单位
+    name: 测试单位name
+    项目名称: 测试项目
+    项目编号: 2015-项目编号-001
+    面积90: 12345.600
+    面积80: 12345.300
+    地籍号: 1234567890010010000
+    四至: 测试路1;测试街2;测试路3;测试街4
+    土地坐落: 测试路以东,测试街以南
+    area: 1000
+    已设定值: value
   '''
 
   info = Information.from_string(text)
@@ -285,6 +278,31 @@ def test_word_filler_render():
 
 
 
+def test_word_filler_render_and_save():
+
+  t1 = os.getcwd() + '/test/test_templates/test_{{name}}_面积计算表.doc'
+  from information import Information
+  text = '''
+    单位名称: 测试单位
+    name: 测试单位name
+    项目名称: 测试项目
+    项目编号: 2015-项目编号-001
+    面积90: 12345.600
+    面积80: 12345.300
+    地籍号: 1234567890010010000
+    四至: 测试路1;测试街2;测试路3;测试街4
+    土地坐落: 测试路以东,测试街以南
+    area: 1000
+    已设定值: value
+  '''
+  info = Information.from_string(text)
+  filler = Filler(template_path=t1)
+
+  filler.render(info=info)
+  filler.save(folder=os.getcwd() + '/test/test_output', close=True)
+
+
+
 
 
 
@@ -296,16 +314,16 @@ def test_jinja():
   from information import Information
 
   text = '''
-  单位名称: 测试单位
-  项目名称: 测试项目
-  项目编号: 2015-项目编号-001
-  面积90: 12345.600
-  面积80: 12345.300
-  地籍号: 1234567890010010000
-  四至: 测试路1;测试街2;测试路3;测试街4
-  土地坐落: 测试路以东,测试街以南
-  area: 1000
-  已设定值: value
+    单位名称: 测试单位
+    项目名称: 测试项目
+    项目编号: 2015-项目编号-001
+    面积90: 12345.600
+    面积80: 12345.300
+    地籍号: 1234567890010010000
+    四至: 测试路1;测试街2;测试路3;测试街4
+    土地坐落: 测试路以东,测试街以南
+    area: 1000
+    已设定值: value
   '''
   info = Information.from_string(text)
 
@@ -385,6 +403,181 @@ class ExcelFiller:
   def __init__(self, template_path, app):
     self.template_path = template_path
     self.app = app
+    self.document = self.app.Workbooks.Open(template_path)
+
+
+  def detect_required_fields(self, close=True, unique=False):
+
+    self.document = self.app.Workbooks.Open(self.template_path)
+    sheet = self.document.WorkSheets.Item(1)
+
+
+    field_names = re.findall(r'{{.+?}}', self.template_path)
+    for cell in self.field_cells(sheet):
+      for match in re.findall(r'{{.+?}}', cell.Value):
+        field_names.append(match)
+
+    if close:
+      self.document.Close()
+
+    if unique:
+      unique_names = []
+      for name in field_names:
+        unique_names.extend(extract_field(name))
+      return list(dedupe(unique_names))
+    else:
+      return field_names
+
+
+
+  def used_cells(self, sheet):
+    for cell in sheet.UsedRange.Cells:
+      yield cell
+
+  def field_cells(self, sheet):
+    for cell in self.used_cells(sheet):
+      value = str(cell.Value)
+      if value and re.match(r'.*?{{.+?}}', value):
+        # puts(value)
+        yield cell
+
+
+
+  def render(self, info):
+    self.info = info
+    self.app.Visible = True
+    sheet = self.document.WorkSheets.Item(1)
+    for cell in self.field_cells(sheet):
+      cell_string = cell.Value
+      cell.Value = evalute_field(cell_string, info)
+
+
+
+
+  def save(self, folder, close=True):
+
+    output_name = evalute_field(os.path.basename(self.template_path), self.info)
+    output_path = os.path.join(folder, output_name)
+
+    if os.path.exists(output_path):
+      fix = time.strftime('.backup-%Y%m%d-%H%M%S')
+      os.rename(output_path, fix.join(os.path.splitext(output_path)))
+    try:
+      self.document.SaveAs(output_path)
+    except Exception:
+      t = 'Excel Filler can not save document: <{}>'.format(output_path)
+      raise SaveDocumentError(t)
+
+    if close:
+      self.document.Close()
+
+
+
+
+
+
+def test_excel_filler_detect_fields():
+
+
+  t1 = os.getcwd() + '/test/test_templates/_test_{{项目名称}}-申请表.xls'
+
+  filler = Filler(template_path=t1)
+  filler.detect_required_fields(unique=False) | puts()
+  filler.detect_required_fields(unique=True) | puts()
+
+
+def test_excel_filler_render():
+
+
+  t1 = os.getcwd() + '/test/test_templates/_test_{{项目名称}}-申请表.xls'
+  from information import Information
+
+  text = '''
+    单位名称: 测试单位
+    name: 测试单位name
+    项目名称: 测试项目
+    项目编号: 2015-项目编号-001
+    面积90: 12345.600
+    面积80: 12345.300
+    地籍号: 1234567890010010000
+    四至: 测试路1;测试街2;测试路3;测试街4
+    土地坐落: 测试路以东,测试街以南
+    area: 1000
+    已设定值: value
+  '''
+
+  info = Information.from_string(text)
+
+  filler = Filler(template_path=t1)
+
+  filler.render(info=info)
+
+
+
+
+def test_excel_filler_render_and_save():
+
+  t1 = os.getcwd() + '/test/test_templates/_test_{{项目名称}}-申请表.xls'
+
+  from information import Information
+  text = '''
+    单位名称: 测试单位
+    name: 测试单位name
+    项目名称: 测试项目
+    项目编号: 2015-项目编号-001
+    面积90: 12345.600
+    面积80: 12345.300
+    地籍号: 1234567890010010000
+    四至: 测试路1;测试街2;测试路3;测试街4
+    土地坐落: 测试路以东,测试街以南
+    area: 1000
+    已设定值: value
+  '''
+  info = Information.from_string(text)
+  filler = Filler(template_path=t1)
+
+  filler.render(info=info)
+  filler.save(folder=os.getcwd() + '/test/test_output', close=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
