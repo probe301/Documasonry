@@ -8,8 +8,8 @@
 
 Template Engine for Word / Excel AutoCAD
 
-- jinja2 template
-- yaml config
+- use jinja2 for templating
+- use yaml for config
 - detect name and doc body fields
 - generate vertex table
 

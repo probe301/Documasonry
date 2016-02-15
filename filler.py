@@ -12,8 +12,8 @@ import time
 from pylon import datalines
 
 def extract_field(field):
-  # {{name | lower}}
-  # return field[2:-2].split('|')[0].strip()
+  # {{name | lower}} -> ['name'] because lower is pipe method
+  # {{(area1 - area0) / area0}} -> ['area1', 'area0'] because two variable in one field
   ast = Environment().parse(field)
   return meta.find_undeclared_variables(ast)
 
@@ -65,11 +65,11 @@ class Filler(AutoDelegator):
       self.app_name = 'Office Word'
       filler = WordFiller(template_path, word)
 
-    elif template_path.endswith(('.dwg', )):
+    elif template_path.endswith(('.dwg', '.dxf')):
       cad = win32com.client.Dispatch('AutoCAD.Application')
-      # word.Visible = False
+      # cad.Visible = False
       self.app_name = 'Autodesk AutoCAD'
-      filler = WordFiller(template_path, cad)
+      filler = AutoCADFiller(template_path, cad)
 
 
     self.delegates = [filler]
@@ -86,19 +86,22 @@ class Filler(AutoDelegator):
 
 
 
+  def save(self, folder, info, close=True):
 
+    output_name = evalute_field(os.path.basename(self.template_path), info)
+    output_path = os.path.join(folder, output_name)
 
+    if os.path.exists(output_path):
+      fix = time.strftime('.backup-%Y%m%d-%H%M%S')
+      os.rename(output_path, fix.join(os.path.splitext(output_path)))
+    try:
+      self.document.SaveAs(output_path)
+    except Exception:
+      t = 'Word Filler can not save document: <{}>'.format(output_path)
+      raise SaveDocumentError(t)
 
-  def output_name(self):
-    tmpl_name = re.split(r'\/|\\', self.tmpl_path)[-1]
-    output_name = tmpl_name[:]
-    # print(tmpl_name)
-    for match in re.finditer(r'{.+?}', tmpl_name):
-      field_name = match.group()
-      if Field(field_name).calculate(self.content):
-        output_name = re.sub(field_name, Field(field_name).calculate(self.content), output_name)
-    return output_name
-
+    if close:
+      self.document.Close()
 
 
 
@@ -197,23 +200,6 @@ class WordFiller:
       # print(field_names)
 
 
-
-  def save(self, folder, close=True):
-
-    output_name = evalute_field(os.path.basename(self.template_path), self.info)
-    output_path = os.path.join(folder, output_name)
-
-    if os.path.exists(output_path):
-      fix = time.strftime('.backup-%Y%m%d-%H%M%S')
-      os.rename(output_path, fix.join(os.path.splitext(output_path)))
-    try:
-      self.document.SaveAs(output_path)
-    except Exception:
-      t = 'Word Filler can not save document: <{}>'.format(output_path)
-      raise SaveDocumentError(t)
-
-    if close:
-      self.document.Close()
 
 
 
@@ -408,7 +394,7 @@ class ExcelFiller:
 
   def detect_required_fields(self, close=True, unique=False):
 
-    self.document = self.app.Workbooks.Open(self.template_path)
+    # self.document = self.app.Workbooks.Open(self.template_path)
     sheet = self.document.WorkSheets.Item(1)
 
 
@@ -453,23 +439,6 @@ class ExcelFiller:
 
 
 
-
-  def save(self, folder, close=True):
-
-    output_name = evalute_field(os.path.basename(self.template_path), self.info)
-    output_path = os.path.join(folder, output_name)
-
-    if os.path.exists(output_path):
-      fix = time.strftime('.backup-%Y%m%d-%H%M%S')
-      os.rename(output_path, fix.join(os.path.splitext(output_path)))
-    try:
-      self.document.SaveAs(output_path)
-    except Exception:
-      t = 'Excel Filler can not save document: <{}>'.format(output_path)
-      raise SaveDocumentError(t)
-
-    if close:
-      self.document.Close()
 
 
 
@@ -594,9 +563,87 @@ def test_excel_filler_render_and_save():
 
 class AutoCADFiller:
   def __init__(self, template_path, app):
-    self.template_path = template_path
+    self.template_path = re.sub('/', '\\\\', template_path)
     self.app = app
+    self.document = self.app.Documents.Open(template_path)
 
+
+  def detect_required_fields(self, close=True, unique=False):
+
+    field_names = re.findall(r'{{.+?}}', self.template_path)
+
+    for en in self.field_text_entities():
+      for match in re.findall(r'{{.+?}}', en.TextString):
+        field_names.append(match)
+
+    if unique:
+      unique_names = []
+      for name in field_names:
+        unique_names.extend(extract_field(name))
+      return list(dedupe(unique_names))
+    else:
+      return field_names
+
+  def field_text_entities(self):
+    msitem = self.document.ModelSpace.Item
+    entities_count = self.document.ModelSpace.Count
+    for i in range(entities_count):
+      entity = msitem(i)
+      if entity.EntityName[4:] in ['Text', ]:
+        yield entity
+
+
+  def render(self, info):
+    self.info = info
+    self.app.Visible = True
+    for en in self.field_text_entities():
+      val = evalute_field(field=en.TextString, info=info)
+      if val in (None, ''):
+        raise NoInfoKeyError('无法找到字段的值 {}'.format(en.TextString))
+
+      en.TextString = val
+
+
+
+
+
+
+
+
+def test_cad_filler_detect_fields():
+
+  t1 = os.getcwd() + '/test/test_templates/test_{{测试单位}}-宗地图.dwg'
+
+  filler = Filler(template_path=t1)
+  filler.detect_required_fields(unique=False) | puts()
+  filler.detect_required_fields(unique=True) | puts()
+
+
+
+def test_cad_filler_render():
+
+  t1 = os.getcwd() + '/test/test_templates/test_{{测试单位}}-宗地图.dwg'
+
+  from information import Information
+  text = '''
+    测试单位: 测试单位name
+    # title: testtitle
+    project: custom_project
+    date: 0160202
+    ratio: 1000
+    landcode: 200
+    area80: 123.4
+    area90: 234.5
+    地籍号: 10939512
+  '''
+  info = Information.from_string(text)
+  filler = Filler(template_path=t1)
+  filler.render(info=info)
+  filler.save(folder=os.getcwd() + '/test/test_output', info=info, close=True)
+
+  # TODO: if templates tring has multiple field and just missing 1 value,
+  # in this case it cannot catch 'NoInfoKeyError'
+  # template '{{a}}:::{{b}}' a=null, b= test -> ':::test' no raise exception here!
 
 
 

@@ -128,7 +128,7 @@ def test_figlet():
 
   generate_figlet('excelfiller', fonts=['space_op', ])
   generate_figlet('wordfiller', fonts=['space_op', ])
-  generate_figlet('autocadfiller', fonts=['space_op', ])
+  generate_figlet('ry', fonts=['space_op', ])
 
 
 
