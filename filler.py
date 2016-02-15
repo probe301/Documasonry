@@ -53,6 +53,7 @@ class Filler(AutoDelegator):
   def __init__(self, template_path, app=None):
     self.template_path = template_path
     self.info = None
+    self.output_name = None
     if template_path.endswith(('.xls', '.xlsx')):
       excel = win32com.client.Dispatch('Excel.Application')
       # excel.Visible = False
@@ -86,10 +87,9 @@ class Filler(AutoDelegator):
 
 
 
-  def save(self, folder, info, close=True):
-
-    output_name = evalute_field(os.path.basename(self.template_path), info)
-    output_path = os.path.join(folder, output_name)
+  def save(self, info, folder, close=True):
+    self.output_name = evalute_field(os.path.basename(self.template_path), info)
+    output_path = os.path.join(folder, self.output_name)
 
     if os.path.exists(output_path):
       fix = time.strftime('.backup-%Y%m%d-%H%M%S')
@@ -180,6 +180,7 @@ class WordFiller:
 
 
   def render(self, info):
+
     self.info = info
     self.app.Visible = True
     for field in self.detect_required_fields(close=False, unique=False):
@@ -430,6 +431,8 @@ class ExcelFiller:
 
 
   def render(self, info):
+
+
     self.info = info
     self.app.Visible = True
     sheet = self.document.WorkSheets.Item(1)
@@ -594,6 +597,8 @@ class AutoCADFiller:
 
 
   def render(self, info):
+
+
     self.info = info
     self.app.Visible = True
     for en in self.field_text_entities():
