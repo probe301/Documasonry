@@ -87,8 +87,8 @@ class Filler(AutoDelegator):
 
 
 
-  def save(self, info, folder, close=True):
-    self.output_name = evalute_field(os.path.basename(self.template_path), info)
+  def save(self, info, folder, close=True, prefix=''):
+    self.output_name = prefix + evalute_field(os.path.basename(self.template_path), info)
     output_path = os.path.join(folder, self.output_name)
 
     if os.path.exists(output_path):
@@ -565,6 +565,32 @@ def test_excel_filler_render_and_save():
 
 
 class AutoCADFiller:
+  """ AutoCAD filler 特殊 method / field
+  - insert block {{地形}} to back layer
+  - 位置校正
+    原始模板在(0, 0)处 需要调整到界址线图形所在位置
+    polygon边框确定:
+      参数 padding比例, 是否方形
+      先定位中心 c, 边界框 w, h
+      padding = max(w, h) * padding_ratio
+      方形 ? 边界框长边 + padding : 边界框长边短边分别 + padding
+
+  yaml_text = '''
+    项目名称: test1
+    单位名称: test2
+    地籍号: 110123122
+    name: sjgisdgd
+    面积90: 124.1
+    面积80: 234.2
+    zdfile: zd.dwg
+    地形file: dx.dwg
+    日期: today
+  '''
+
+
+  """
+
+
   def __init__(self, template_path, app):
     self.template_path = re.sub('/', '\\\\', template_path)
     self.app = app
@@ -572,13 +598,10 @@ class AutoCADFiller:
 
 
   def detect_required_fields(self, close=True, unique=False):
-
     field_names = re.findall(r'{{.+?}}', self.template_path)
-
     for en in self.field_text_entities():
       for match in re.findall(r'{{.+?}}', en.TextString):
         field_names.append(match)
-
     if unique:
       unique_names = []
       for name in field_names:
@@ -597,16 +620,28 @@ class AutoCADFiller:
 
 
   def render(self, info):
-
-
     self.info = info
     self.app.Visible = True
     for en in self.field_text_entities():
       val = evalute_field(field=en.TextString, info=info)
       if val in (None, ''):
         raise NoInfoKeyError('无法找到字段的值 {}'.format(en.TextString))
-
       en.TextString = val
+
+
+  def fix_position(self, center=(0, 0), scale=1):
+    pass
+
+
+  def insert_block(self, block_path):
+    pass
+
+
+
+
+
+
+
 
 
 
@@ -650,6 +685,17 @@ def test_cad_filler_render():
   # in this case it cannot catch 'NoInfoKeyError'
   # template '{{a}}:::{{b}}' a=null, b= test -> ':::test' no raise exception here!
 
+
+
+
+
+def test_cad_filler_fix_position():
+  t1 = os.getcwd() + '/test/test_cad_embad/test_{{测试单位}}-embad_dwg_file.dwg'
+
+  filler = Filler(template_path=t1)
+  filler.detect_required_fields(unique=False) | puts()
+  filler.detect_required_fields(unique=True)  | puts()
+  filler.render()
 
 
 
