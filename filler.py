@@ -123,6 +123,9 @@ class NoInfoKeyError(Exception):
 class SaveDocumentError(Exception):
   pass
 
+class AutoCADCustomFieldError(Exception):
+  pass
+
 
 
 
@@ -599,7 +602,7 @@ class AutoCADFiller:
 
   def detect_required_fields(self, close=True, unique=False):
     field_names = re.findall(r'{{.+?}}', self.template_path)
-    for en in self.field_text_entities():
+    for en in self.text_entities():
       for match in re.findall(r'{{.+?}}', en.TextString):
         field_names.append(match)
     if unique:
@@ -610,31 +613,95 @@ class AutoCADFiller:
     else:
       return field_names
 
-  def field_text_entities(self):
+
+  def text_entities(self):
+    '''CAD中文字实体'''
+    return list(self.entities(kinds='Text'))
+
+  def border_entities(self, border_layer):
+    '''CAD中特定图层的Polygon实体'''
+    return list(self.entities(kinds='Polyline', layers=border_layer))
+
+
+  def entities(self, kinds=None, layers=None):
     msitem = self.document.ModelSpace.Item
     entities_count = self.document.ModelSpace.Count
+    if isinstance(kinds, str):
+      kinds = [kinds]
+    if isinstance(layers, str):
+      layers = [layers]
     for i in range(entities_count):
       entity = msitem(i)
-      if entity.EntityName[4:] in ['Text', ]:
-        yield entity
+      if kinds and entity.EntityName[4:] not in kinds:
+        continue
+      if layers and entity.Layer not in layers:
+        continue
+      yield entity
 
 
   def render(self, info):
     self.info = info
     self.app.Visible = True
-    for en in self.field_text_entities():
+    for en in self.text_entities():
       val = evalute_field(field=en.TextString, info=info)
       if val in (None, ''):
         raise NoInfoKeyError('无法找到字段的值 {}'.format(en.TextString))
       en.TextString = val
 
 
-  def fix_position(self, center=(0, 0), scale=1):
-    pass
+  def fix_position(self, target_center=None, target_size=None):
+    ''' 依据特定的存放框架的图层来平移缩放模板位置
+    template 中 border_source 层中的第一个矩形框定义模板原始位置
+                border_target 层中的第一个矩形框定义平移缩放到的位置
+    平移方法: 两个矩形框中心作为平移矢量
+    缩放方法: 两个矩形框width比率和height比率中较大者作为缩放因子
+              目标矩形框中心作为缩放中心
+
+    '''
+    source_borders = self.border_entities('border_source')
+    if not source_borders:
+      raise AutoCADCustomFieldError('cannot find source border polyline')
+    source_entity = source_borders[0]
+    source_center = self.mid_point(source_entity)
+    source_size = self.bounding_box_size(source_entity)
+
+    if not target_center or not target_size:
+      '''不提供目标位置参数
+      则从图层 border_target 中找到 polyline 来计算目标位置参数'''
+      target_borders = self.border_entities('border_target')
+      if not target_borders:
+        raise AutoCADCustomFieldError('cannot find target border polyline')
+      target_entity = target_borders[0]
+      target_center = self.mid_point(target_entity)
+      target_size = self.bounding_box_size(target_entity)
 
 
-  def insert_block(self, block_path):
-    pass
+    offset = target_center[0] - source_center[0], target_center[1] - source_center[1]
+    scale_factor = max([target_size[0]/source_size[0], target_size[1]/source_size[1]])
+
+    move_cmd = 'move all  d {},{} '.format(offset[0], offset[1])
+    scale_cmd = 'scale all  {},{} {} '.format(target_center[0], target_center[1], scale_factor)
+    self.document.SendCommand(move_cmd)
+    self.document.SendCommand(scale_cmd)
+
+
+  def mid_point(self, entity):
+    min_point, max_point = entity.GetBoundingBox()
+    return (min_point[0] + max_point[0])/2, (min_point[1] + max_point[1])/2
+  def bounding_box_size(self, entity):
+    min_point, max_point = entity.GetBoundingBox()
+    return max_point[0] - min_point[0], max_point[1] - min_point[1]
+
+
+  def insert_block(self, dwg_path):
+    '''嵌入外部dwg图形
+    block name 会被自动设为 dwg 文件名(不含扩展名)
+    所以需要保证原图没有重名的block
+
+    dwg_path 中允许空格'''
+
+    insert_cmd = '-insert {dwg_path}\n0,0 1 1 0 '.format(dwg_path=dwg_path)
+    self.document.SendCommand(insert_cmd)
 
 
 
@@ -693,9 +760,21 @@ def test_cad_filler_fix_position():
   t1 = os.getcwd() + '/test/test_cad_embad/test_{{测试单位}}-embad_dwg_file.dwg'
 
   filler = Filler(template_path=t1)
-  filler.detect_required_fields(unique=False) | puts()
-  filler.detect_required_fields(unique=True)  | puts()
-  filler.render()
+  # filler.render()
+  # filler.fix_position(target_center=(10000, 10000), target_size=(10, 20))
+  filler.fix_position()
+
+
+def test_cad_filler_insert_block():
+  t1 = os.getcwd() + '/test/test_cad_embad/test_{{测试单位}}-embad_dwg_file.dwg'
+  block_path = os.getcwd() + '/test/test_cad_embad/test_dixing1.dwg'
+  block_path = os.getcwd() + '/test/test_cad_embad/gh.dwg' # test duplicate block name
+  # block_path = os.getcwd() + '/test/test_cad_embad/g  h  2.dwg' # test space in file name
+  filler = Filler(template_path=t1)
+  filler.insert_block(dwg_path=block_path)
+  # filler.insert_block(dwg_path=block_path2)
+
+
 
 
 
