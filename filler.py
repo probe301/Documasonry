@@ -11,25 +11,18 @@ from jinja2 import Environment
 import time
 from pylon import datalines
 
+
+
 def extract_field(field):
   # {{name | lower}} -> ['name'] because lower is pipe method
   # {{(area1 - area0) / area0}} -> ['area1', 'area0'] because two variable in one field
   ast = Environment().parse(field)
   return meta.find_undeclared_variables(ast)
 
-
 def evalute_field(field, info):
   # return info.content.get(field)
   template = Template(field)
   return template.render(**info.content)
-
-
-
-
-
-
-
-
 
 
 
@@ -44,52 +37,42 @@ def evalute_field(field, info):
 class Filler(AutoDelegator):
   """ docstring for Filler
 
-      filler = Filler.from_template(path='')
+      filler = Filler(template_path, output_folder)
       filler.detect_required_fields()
       filler.render(info=yaml_info)
-      filler.save(folder='path/to/', close=True)
+      filler.save(info=yaml_info, close=True)
 
   """
-  def __init__(self, template_path, app=None):
+  def __init__(self, template_path, output_folder):
     self.template_path = template_path
+    self.output_folder = output_folder
     self.info = None
     self.output_name = None
     if template_path.endswith(('.xls', '.xlsx')):
       excel = win32com.client.Dispatch('Excel.Application')
       # excel.Visible = False
       self.app_name = 'Office Excel'
-      filler = ExcelFiller(template_path, excel)
-
+      filler = ExcelFiller(template_path, output_folder, app=excel)
     elif template_path.endswith(('.doc', '.docx')):
       word = win32com.client.Dispatch('Word.Application')
       # word.Visible = False
       self.app_name = 'Office Word'
-      filler = WordFiller(template_path, word)
-
+      filler = WordFiller(template_path, output_folder, app=word)
     elif template_path.endswith(('.dwg', '.dxf')):
       cad = win32com.client.Dispatch('AutoCAD.Application')
       # cad.Visible = False
       self.app_name = 'Autodesk AutoCAD'
-      filler = AutoCADFiller(template_path, cad)
+      filler = AutoCADFiller(template_path, output_folder, app=cad)
 
+    self.delegates = [filler] # delegates render and detect_required_filds
 
-    self.delegates = [filler]
-    # delegates:
-    # filler.detect_required_fields()
-    # filler.render(info=yaml_info)
-    # filler.save(folder='path/to/', close=True)
 
   def __str__(self):
     return '<Filler type={} template_path={}>'.format(self.app_name, self.template_path)
 
-
-
-
-
-
-  def save(self, info, folder, close=True, prefix=''):
+  def save(self, info, close=True, prefix=''):
     self.output_name = prefix + evalute_field(os.path.basename(self.template_path), info)
-    output_path = os.path.join(folder, self.output_name)
+    output_path = os.path.join(self.output_folder, self.output_name)
 
     if os.path.exists(output_path):
       fix = time.strftime('.backup-%Y%m%d-%H%M%S')
@@ -145,7 +128,7 @@ class AutoCADCustomFieldError(Exception):
 
 
 class WordFiller:
-  def __init__(self, template_path, app):
+  def __init__(self, template_path, output_folder, app):
     self.template_path = template_path
     self.app = app
     self.document = self.app.Documents.Open(self.template_path)
@@ -162,8 +145,6 @@ class WordFiller:
     # 'Wrap', 'Format', 'ReplaceWith', 'Replace', 'MatchKashida',
     # 'MatchDiacritics', 'MatchAlefHamza', 'MatchControl'],
     # varargs=None, keywords=None, defaults=())
-
-
     field_names = re.findall(r'{{.+?}}', self.template_path)
     while text_range.Find.Execute(text, False, False, True, False, False, True, 0, True, 'NewStr', 0):
       field_names.append(text_range.Text)
@@ -221,18 +202,20 @@ def test_word_filler_detect_fields():
   yaml_info = Information.from_yaml(os.getcwd() + '/test/测试单位.inf')
 
 
-  filler = Filler(template_path=t1)
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=False) | puts()
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=True) | puts()
 
 
-  filler = Filler(template_path=t2)
+  filler = Filler(template_path=t2, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=False) | puts()
+  filler = Filler(template_path=t2, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=True) | puts()
 
 
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=yaml_info)
-  # filler.save(folder='path/to/', close=True)
 
 
 def test_word_filler_render():
@@ -258,12 +241,13 @@ def test_word_filler_render():
 
   info = Information.from_string(text)
 
-  filler = Filler(template_path=t1)
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=False) | puts()
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=True) | puts()
 
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=info)
-  # filler.save(folder='path/to/', close=True)
 
 
 
@@ -286,10 +270,10 @@ def test_word_filler_render_and_save():
     已设定值: value
   '''
   info = Information.from_string(text)
-  filler = Filler(template_path=t1)
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
 
   filler.render(info=info)
-  filler.save(folder=os.getcwd() + '/test/test_output', close=True)
+  filler.save(info=info, close=True)
 
 
 
@@ -355,13 +339,6 @@ def test_jinja():
       if rendered.strip() != spec.strip():
         print('! ', line)
 
-  # filler.save(folder='path/to/', close=True)
-
-
-
-
-
-
 
 
 
@@ -390,7 +367,7 @@ def test_jinja():
 
 
 class ExcelFiller:
-  def __init__(self, template_path, app):
+  def __init__(self, template_path, output_folder, app):
     self.template_path = template_path
     self.app = app
     self.document = self.app.Workbooks.Open(template_path)
@@ -453,11 +430,10 @@ class ExcelFiller:
 
 def test_excel_filler_detect_fields():
 
-
   t1 = os.getcwd() + '/test/test_templates/_test_{{项目名称}}-申请表.xls'
-
-  filler = Filler(template_path=t1)
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=False) | puts()
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=True) | puts()
 
 
@@ -480,11 +456,8 @@ def test_excel_filler_render():
     area: 1000
     已设定值: value
   '''
-
   info = Information.from_string(text)
-
-  filler = Filler(template_path=t1)
-
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=info)
 
 
@@ -509,31 +482,10 @@ def test_excel_filler_render_and_save():
     已设定值: value
   '''
   info = Information.from_string(text)
-  filler = Filler(template_path=t1)
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
 
   filler.render(info=info)
-  filler.save(folder=os.getcwd() + '/test/test_output', close=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  filler.save(info=info, close=True)
 
 
 
@@ -594,8 +546,9 @@ class AutoCADFiller:
   """
 
 
-  def __init__(self, template_path, app):
+  def __init__(self, template_path, output_folder, app):
     self.template_path = re.sub('/', '\\\\', template_path)
+    self.output_folder = output_folder
     self.app = app
     self.document = self.app.Documents.Open(template_path)
 
@@ -605,6 +558,8 @@ class AutoCADFiller:
     for en in self.text_entities():
       for match in re.findall(r'{{.+?}}', en.TextString):
         field_names.append(match)
+    if close:
+      self.document.Close()
     if unique:
       unique_names = []
       for name in field_names:
@@ -617,6 +572,7 @@ class AutoCADFiller:
   def text_entities(self):
     '''CAD中文字实体'''
     return list(self.entities(kinds='Text'))
+
 
   def border_entities(self, border_layer):
     '''CAD中特定图层的Polygon实体'''
@@ -646,7 +602,15 @@ class AutoCADFiller:
       val = evalute_field(field=en.TextString, info=info)
       if val in (None, ''):
         raise NoInfoKeyError('无法找到字段的值 {}'.format(en.TextString))
-      en.TextString = val
+
+      if en.TextString.startswith('{{') and en.TextString.endswith('file}}'):
+        # block field syntax should insert dwg block
+        if not os.path.isfile(val):
+          val = os.path.join(self.output_folder, val)
+        self.insert_block(dwg_path=val)
+        en.Delete()
+      else:
+        en.TextString = val
 
 
   def fix_position(self, target_center=None, target_size=None):
@@ -688,6 +652,8 @@ class AutoCADFiller:
   def mid_point(self, entity):
     min_point, max_point = entity.GetBoundingBox()
     return (min_point[0] + max_point[0])/2, (min_point[1] + max_point[1])/2
+
+
   def bounding_box_size(self, entity):
     min_point, max_point = entity.GetBoundingBox()
     return max_point[0] - min_point[0], max_point[1] - min_point[1]
@@ -697,9 +663,7 @@ class AutoCADFiller:
     '''嵌入外部dwg图形
     block name 会被自动设为 dwg 文件名(不含扩展名)
     所以需要保证原图没有重名的block
-
     dwg_path 中允许空格'''
-
     insert_cmd = '-insert {dwg_path}\n0,0 1 1 0 '.format(dwg_path=dwg_path)
     self.document.SendCommand(insert_cmd)
 
@@ -720,9 +684,9 @@ class AutoCADFiller:
 def test_cad_filler_detect_fields():
 
   t1 = os.getcwd() + '/test/test_templates/test_{{测试单位}}-宗地图.dwg'
-
-  filler = Filler(template_path=t1)
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=False) | puts()
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=True) | puts()
 
 
@@ -744,37 +708,52 @@ def test_cad_filler_render():
     地籍号: 10939512
   '''
   info = Information.from_string(text)
-  filler = Filler(template_path=t1)
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=info)
-  filler.save(folder=os.getcwd() + '/test/test_output', info=info, close=True)
+  filler.save(info=info, close=True)
 
   # TODO: if templates tring has multiple field and just missing 1 value,
   # in this case it cannot catch 'NoInfoKeyError'
   # template '{{a}}:::{{b}}' a=null, b= test -> ':::test' no raise exception here!
 
 
-
-
-
 def test_cad_filler_fix_position():
-  t1 = os.getcwd() + '/test/test_cad_embad/test_{{测试单位}}-embad_dwg_file.dwg'
+  t1 = os.getcwd() + '/test/test_templates/test_cad_insert_block.dwg'
 
-  filler = Filler(template_path=t1)
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   # filler.render()
   # filler.fix_position(target_center=(10000, 10000), target_size=(10, 20))
   filler.fix_position()
 
 
 def test_cad_filler_insert_block():
-  t1 = os.getcwd() + '/test/test_cad_embad/test_{{测试单位}}-embad_dwg_file.dwg'
-  block_path = os.getcwd() + '/test/test_cad_embad/test_dixing1.dwg'
-  block_path = os.getcwd() + '/test/test_cad_embad/gh.dwg' # test duplicate block name
-  # block_path = os.getcwd() + '/test/test_cad_embad/g  h  2.dwg' # test space in file name
-  filler = Filler(template_path=t1)
+  t1 = os.getcwd() + '/test/test_templates/test_cad_insert_block.dwg'
+  block_path = os.getcwd() + '/test/test_templates/dixing.dwg'
+  # block_path = os.getcwd() + '/test/test_templates/gh.dwg' # test block name already exists in cadfile
+  # block_path = os.getcwd() + '/test/test_templates/gui  hua.dwg' # test space in file name
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.insert_block(dwg_path=block_path)
-  # filler.insert_block(dwg_path=block_path2)
 
 
+def test_cad_filler_insert_block_from_yaml_config_relative_path():
+  from information import Information
+  text = '''
+    测试单位: 测试单位name
+    # title: testtitle
+    project: custom_project
+    date: 0160202
+    ratio: 1000
+    landcode: 200
+    area80: 123.4
+    area90: 234.5
+    地籍号: 10939512
+    地形file: ../test_templates/dixing.dwg
+  '''
+  info = Information.from_string(text)
+  t1 = os.getcwd() + '/test/test_templates/test_cad_insert_block.dwg'
+  filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
+  filler.render(info=info)
+  filler.save(info=info, close=True)
 
 
 
