@@ -1,6 +1,7 @@
 
 
 from pylon import puts
+import pylon
 import re
 import os
 import sys
@@ -292,15 +293,15 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
     self.set_logger(logger=None, text_browser_id='color_logger')
 
 
-
   def set_bindings(self):
+    self.documasonry = Documasonry(output_path='', template_paths=[])
     self.init_templates_table()
+    self.add_templates_from_config()
+    self.rebuild_required_info_text(quick=True)
     self.set_window_order(top=True)
     self.keyPressEvent = self.clear_and_close
     self.set_templates_dropper()
     self.set_info_text_dropper()
-
-
 
     self.css = '''
     #templates_table { background-color: #ffffff; }
@@ -310,9 +311,16 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
     self.ui.setStyleSheet(self.css)
 
 
+  def rebuild_required_info_text(self, quick):
+    template_paths = self.get_templates_from_table()
+    self.documasonry.set_template_paths(template_paths)
+    required_text = self.documasonry.generate_required_fields_info_text(quick=quick)
+    self.info_textedit.setPlainText(required_text)
+
+
   def set_templates_dropper(self):
     def templates_drop_done(dropper):
-      self.add_templates_to_table(dropper.selecting)
+      self.add_templates_from_browser(dropper.selecting)
     DragInArea(widget_id='templates_table',
                main_window=self,
                accept_exts='doc docx dwg xls xlsx txt'.split(' '),
@@ -337,7 +345,6 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
         yield checker
 
 
-
   def init_templates_table(self):
     templates_table = self.templates_table
     templates_table.verticalHeader().setVisible(False)
@@ -345,22 +352,43 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
     templates_table.setColumnCount(1)
     templates_table.setRowCount(0)
 
-  def add_templates_to_table(self, file_paths):
+
+  def add_templates_from_browser(self, file_paths):
     templates_table = self.templates_table
     for file_path in file_paths:
       exist_checkers = self.get_table_items(table=templates_table)
       if os.path.abspath(file_path) in [c.template_path for c in exist_checkers]:
         continue
-      name = os.path.basename(file_path)
-      row_count = templates_table.rowCount()
-      templates_table.insertRow(row_count)
+      self.add_checker(table=templates_table,
+                       template_path=file_path,
+                       selected=True)
 
-      checker = QCheckBox(name)
-      checker.setChecked(True)
-      checker.template_path = os.path.abspath(file_path)
-      templates_table.setCellWidget(row_count, 0, checker)
+  def add_templates_from_config(self):
+    items = self.documasonry.read_config()['default_templates']
+    items = list(pylon.dedupe(items, key=lambda x: x['file']))
+    templates_table = self.templates_table
+    for item in items:
+      self.add_checker(table=templates_table,
+                       template_path=item['file'],
+                       selected=item['selected'])
 
-    templates_table.resizeColumnsToContents()
+
+  def add_checker(self, table, template_path, selected):
+    name = os.path.basename(template_path)
+    row_count = table.rowCount()
+    table.insertRow(row_count)
+    checker = QCheckBox(name)
+    checker.setChecked(selected)
+    checker.template_path = os.path.abspath(template_path)
+    checker.stateChanged.connect(lambda x: self.rebuild_required_info_text(quick=True))
+    table.setCellWidget(row_count, 0, checker)
+    table.resizeColumnsToContents()
+    return checker
+
+
+  def get_templates_from_table(self):
+    checkers = self.get_table_items(table=self.templates_table, only_checked=True)
+    return [checker.template_path for checker in checkers]
 
 
   @QtCore.pyqtSlot()
@@ -373,15 +401,9 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
     for checker in self.get_table_items(table=self.templates_table):
       checker.setChecked(not checker.isChecked())
 
-
   @QtCore.pyqtSlot()
   def on_detect_required_fields_button_clicked(self):
-    checkers = self.get_table_items(table=self.templates_table, only_checked=False)
-    templates = [checker.template_path for checker in checkers]
-    masonry = Documasonry(output_path=1, template_paths=templates)
-    required_text = masonry.generate_required_fields_info_text(quick=False)
-
-    self.info_textedit.setPlainText(required_text)
+    self.rebuild_required_info_text(quick=False)
 
 
 

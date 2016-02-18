@@ -33,9 +33,9 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>10</y>
+     <y>30</y>
      <width>291</width>
-     <height>211</height>
+     <height>191</height>
     </rect>
    </property>
    <property name="frameShadow">
@@ -54,14 +54,14 @@
   <widget class="QPushButton" name="set_output_path_button">
    <property name="geometry">
     <rect>
-     <x>600</x>
+     <x>590</x>
      <y>270</y>
-     <width>71</width>
+     <width>81</width>
      <height>31</height>
     </rect>
    </property>
    <property name="text">
-    <string>输出路径...</string>
+    <string>成果路径...</string>
    </property>
   </widget>
   <widget class="QLineEdit" name="output_path_textedit">
@@ -69,7 +69,7 @@
     <rect>
      <x>10</x>
      <y>270</y>
-     <width>581</width>
+     <width>571</width>
      <height>31</height>
     </rect>
    </property>
@@ -78,9 +78,9 @@
    <property name="geometry">
     <rect>
      <x>310</x>
-     <y>10</y>
+     <y>30</y>
      <width>361</width>
-     <height>211</height>
+     <height>231</height>
     </rect>
    </property>
    <property name="font">
@@ -93,9 +93,9 @@
   <widget class="QPushButton" name="detect_required_fields_button">
    <property name="geometry">
     <rect>
-     <x>500</x>
+     <x>10</x>
      <y>230</y>
-     <width>171</width>
+     <width>151</width>
      <height>31</height>
     </rect>
    </property>
@@ -103,20 +103,20 @@
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;也可以从资源管理器拖放文件到左侧区域&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="text">
-    <string>读取模板,列出需填写的字段</string>
+    <string>读取模板,检测其中字段</string>
    </property>
   </widget>
   <widget class="QPushButton" name="generate_button">
    <property name="geometry">
     <rect>
-     <x>220</x>
+     <x>10</x>
      <y>310</y>
-     <width>241</width>
+     <width>661</width>
      <height>41</height>
     </rect>
    </property>
    <property name="text">
-    <string>生成文件</string>
+    <string>按照字段内容填充模板</string>
    </property>
   </widget>
   <widget class="QPushButton" name="invert_select_templates_button">
@@ -159,6 +159,32 @@
      <width>661</width>
      <height>171</height>
     </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>201</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>模板列表(*.doc *.xls *.dwg ...)</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_2">
+   <property name="geometry">
+    <rect>
+     <x>310</x>
+     <y>10</y>
+     <width>201</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>字段属性</string>
    </property>
   </widget>
  </widget>
