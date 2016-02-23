@@ -79,14 +79,6 @@ class QCommonTools(object):
 
 
 
-
-
-
-
-
-
-
-
 class XStream(QtCore.QObject):
   _stdout = None
   _stderr = None
@@ -232,13 +224,16 @@ class DragInArea:
 
   def set_drag_and_drop(self):
     def drag_enter(event):
-      self.change_background(self.hover_color)
+
       file_paths = [urllib.parse.unquote(x.toString()[8:]) for x in event.mimeData().urls()]
       valid_paths = [p for p in file_paths if os.path.isdir(p)]
       valid_files = [p for p in file_paths if os.path.splitext(p)[1][1:].lower() in self.accept_exts]
+      # puts('valid_files valid_paths', self.accept_exts)
       if (('folder' == self.accept_exts) and valid_paths) or valid_files:
+        self.change_background(self.hover_color)
+        # 'can' | puts()
         event.acceptProposedAction()
-        'can'
+
 
     def drag_leave(event):
       self.change_background(self.normal_color)
@@ -296,12 +291,16 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
   def set_bindings(self):
     self.documasonry = Documasonry(output_path='', template_paths=[])
     self.init_templates_table()
+    self.init_output_path_textedit()
     self.add_templates_from_config()
     self.rebuild_required_info_text(quick=True)
     self.set_window_order(top=True)
     self.keyPressEvent = self.clear_and_close
     self.set_templates_dropper()
     self.set_info_text_dropper()
+    self.set_output_path_textedit_dropper()
+
+
 
     self.css = '''
     #templates_table { background-color: #ffffff; }
@@ -310,6 +309,12 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
     '''
     self.ui.setStyleSheet(self.css)
 
+  def init_output_path_textedit(self):
+    path = self.documasonry.read_config().get('default_output_path')
+    if path and os.path.isdir(path):
+      self.output_path_textedit.setText(path)
+    else:
+      self.output_path_textedit.setText('C:/')
 
   def rebuild_required_info_text(self, quick):
     template_paths = self.get_templates_from_table()
@@ -317,6 +322,16 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
     required_text = self.documasonry.generate_required_fields_info_text(quick=quick)
     self.info_textedit.setPlainText(required_text)
 
+  def set_output_path_textedit_dropper(self):
+    def output_path_textedit_drop_done(dropper):
+      # dropper | puts()
+      self.output_path_textedit.setText(dropper.selecting[0])
+    DragInArea(widget_id='output_path_textedit',
+               main_window=self,
+               accept_exts='folder',
+               hover_color='ffede9',
+               accept_single_path=True,
+               callback=output_path_textedit_drop_done)
 
   def set_templates_dropper(self):
     def templates_drop_done(dropper):
@@ -329,8 +344,10 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
 
   def set_info_text_dropper(self):
     def info_text_drop_done(dropper):
-      text = open(dropper.selecting[0], encoding='utf8').read()
-      dropper.widget.setPlainText(text)
+      info_add = open(dropper.selecting[0], encoding='utf8').read()
+      info_org = dropper.widget.toPlainText()
+      info_text_combine = self.documasonry.combine_fields_info_text(info_org, info_add)
+      dropper.widget.setPlainText(info_text_combine)
     DragInArea(widget_id='info_textedit',
                main_window=self,
                accept_exts='txt inf ini yaml md'.split(' '),
@@ -405,7 +422,20 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
   def on_detect_required_fields_button_clicked(self):
     self.rebuild_required_info_text(quick=False)
 
+  @QtCore.pyqtSlot()
+  def on_set_output_path_button_clicked(self):
+    directory = self.select_path(title='选择成果文件存储路径...', current_path='D:/')
+    self.output_path_textedit.setText(directory)
 
+  @QtCore.pyqtSlot()
+  def on_generate_button_clicked(self):
+    msr = self.documasonry
+    msr.set_template_paths(paths=self.get_templates_from_table())
+    msr.set_output_path(path=self.output_path_textedit.text())
+
+    info_text = self.info_textedit.toPlainText()
+    is_add_index = self.add_index_checker.isChecked()
+    msr.generate(info=Information.from_string(info_text), save=True, add_index=is_add_index)
 
 
 

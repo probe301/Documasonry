@@ -73,13 +73,16 @@ class Filler(AutoDelegator):
   def save(self, info, close=True, prefix=''):
     self.output_name = prefix + evalute_field(os.path.basename(self.template_path), info)
     output_path = os.path.join(self.output_folder, self.output_name)
-
+    output_path = output_path.replace('\\', '/')
+    output_path = output_path.replace('/', '\\')
     if os.path.exists(output_path):
       fix = time.strftime('.backup-%Y%m%d-%H%M%S')
       os.rename(output_path, fix.join(os.path.splitext(output_path)))
     try:
       self.document.SaveAs(output_path)
+      puts('save document done - output_path')
     except Exception:
+      raise
       t = 'Word Filler can not save document: <{}>'.format(output_path)
       raise SaveDocumentError(t)
 
@@ -682,7 +685,6 @@ class AutoCADFiller:
 
 
 def test_cad_filler_detect_fields():
-
   t1 = os.getcwd() + '/test/test_templates/test_{{测试单位}}-宗地图.dwg'
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=False) | puts()
@@ -692,9 +694,7 @@ def test_cad_filler_detect_fields():
 
 
 def test_cad_filler_render():
-
   t1 = os.getcwd() + '/test/test_templates/test_{{测试单位}}-宗地图.dwg'
-
   from information import Information
   text = '''
     测试单位: 测试单位name

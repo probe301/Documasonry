@@ -2,6 +2,7 @@
 # Configuration for Documasonry
 
 default_templates:
+
   - file: 'E:\GitHub\Documasonry\test\test_templates\_test_{{项目名称}}-申请表.xls'
     selected: true
     required_fields: ['field1', 'field2', 'field3']
@@ -12,3 +13,6 @@ default_templates:
   - file: 'E:\GitHub\Documasonry\test\test_templates\test_{{测试单位}}-宗地图.dwg'
     selected: true
     required_fields: ['field1', 'field2', 'field4']
+
+
+default_output_path: 'E:\GitHub\Documasonry'
