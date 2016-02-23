@@ -434,8 +434,10 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
     msr.set_output_path(path=self.output_path_textedit.text())
 
     info_text = self.info_textedit.toPlainText()
-    is_add_index = self.add_index_checker.isChecked()
-    msr.generate(info=Information.from_string(info_text), save=True, add_index=is_add_index)
+    need_index = self.add_index_checker.isChecked()
+    msr.generate(info=Information.from_string(info_text),
+                 save=True,
+                 add_index=need_index)
 
 
 

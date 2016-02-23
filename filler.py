@@ -601,12 +601,15 @@ class AutoCADFiller:
   def render(self, info):
     self.info = info
     self.app.Visible = True
+    # 字段编辑之前需要调整模板全体object的位置
+    self.fix_position(target_center=self.info.content['target_center'],
+                      target_size=self.info.content['target_size'])
     for en in self.text_entities():
       val = evalute_field(field=en.TextString, info=info)
       if val in (None, ''):
         raise NoInfoKeyError('无法找到字段的值 {}'.format(en.TextString))
 
-      if en.TextString.startswith('{{') and en.TextString.endswith('file}}'):
+      if en.TextString.startswith('{{') and en.TextString.endswith('dwg}}'):
         # block field syntax should insert dwg block
         if not os.path.isfile(val):
           val = os.path.join(self.output_folder, val)
@@ -614,6 +617,7 @@ class AutoCADFiller:
         en.Delete()
       else:
         en.TextString = val
+    self.document.SendCommand('zoom e ')
 
 
   def fix_position(self, target_center=None, target_size=None):
