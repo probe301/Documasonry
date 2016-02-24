@@ -540,8 +540,8 @@ class AutoCADFiller:
     name: sjgisdgd
     面积90: 124.1
     面积80: 234.2
-    zdfile: zd.dwg
-    地形file: dx.dwg
+    宗地dwg: zd.dwg
+    地形dwg: dx.dwg
     日期: today
   '''
 
@@ -601,9 +601,27 @@ class AutoCADFiller:
   def render(self, info):
     self.info = info
     self.app.Visible = True
-    # 字段编辑之前需要调整模板全体object的位置
-    self.fix_position(target_center=self.info.content['target_center'],
-                      target_size=self.info.content['target_size'])
+    if self.info.content['target_position']:
+      # 如含有 target_position 字段 编辑前需要调整模板全体 object 位置
+      target_position = self.info.content['target_position']
+      if isinstance(target_position, list) and len(target_position) == 4:
+        # target_center and target_size [566371.2180, 4340932.6223, 202.3, 202.3]
+        self.fix_position(target_center=target_position[:2],
+                          target_size=target_position[2:])
+      elif isinstance(target_position, str):
+        if not os.path.isfile(target_position):
+          target_position = os.path.join(self.output_folder, target_position)
+
+        self.insert_block(dwg_path=target_position)
+        last_entity = list(self.entities(kinds='BlockReference'))[0] | puts()
+        target_center = self.mid_point(last_entity)
+        target_size = self.bounding_box_size(last_entity)
+        # print(last_entity.)
+        last_entity.Delete()
+        self.fix_position(target_center=target_center, target_size=target_size)
+
+
+
     for en in self.text_entities():
       val = evalute_field(field=en.TextString, info=info)
       if val in (None, ''):
@@ -620,13 +638,14 @@ class AutoCADFiller:
     self.document.SendCommand('zoom e ')
 
 
-  def fix_position(self, target_center=None, target_size=None):
+
+
+  def fix_position(self, target_center, target_size):
     ''' 依据特定的存放框架的图层来平移缩放模板位置
     template 中 border_source 层中的第一个矩形框定义模板原始位置
-                border_target 层中的第一个矩形框定义平移缩放到的位置
     平移方法: 两个矩形框中心作为平移矢量
     缩放方法: 两个矩形框width比率和height比率中较大者作为缩放因子
-              目标矩形框中心作为缩放中心
+             目标矩形框中心作为缩放中心
 
     '''
     source_borders = self.border_entities('border_source')
@@ -636,16 +655,6 @@ class AutoCADFiller:
     source_center = self.mid_point(source_entity)
     source_size = self.bounding_box_size(source_entity)
 
-    if not target_center or not target_size:
-      '''不提供目标位置参数
-      则从图层 border_target 中找到 polyline 来计算目标位置参数'''
-      target_borders = self.border_entities('border_target')
-      if not target_borders:
-        raise AutoCADCustomFieldError('cannot find target border polyline')
-      target_entity = target_borders[0]
-      target_center = self.mid_point(target_entity)
-      target_size = self.bounding_box_size(target_entity)
-
 
     offset = target_center[0] - source_center[0], target_center[1] - source_center[1]
     scale_factor = max([target_size[0]/source_size[0], target_size[1]/source_size[1]])
@@ -654,6 +663,19 @@ class AutoCADFiller:
     scale_cmd = 'scale all  {},{} {} '.format(target_center[0], target_center[1], scale_factor)
     self.document.SendCommand(move_cmd)
     self.document.SendCommand(scale_cmd)
+    self.change_layer(source_entity, 'border_destination')
+
+
+
+
+
+  def change_layer(self, entity, layer_name):
+    for lay in self.document.Layers:
+      if layer_name == lay.Name:
+        break
+    else:
+      self.document.Layers.Add(layer_name)
+    entity.Layer = layer_name
 
 
   def mid_point(self, entity):
@@ -671,6 +693,8 @@ class AutoCADFiller:
     block name 会被自动设为 dwg 文件名(不含扩展名)
     所以需要保证原图没有重名的block
     dwg_path 中允许空格'''
+    if not os.path.isfile(dwg_path):
+      raise AutoCADCustomFieldError('cannot open file {}'.format(dwg_path))
     insert_cmd = '-insert {dwg_path}\n0,0 1 1 0 '.format(dwg_path=dwg_path)
     self.document.SendCommand(insert_cmd)
 

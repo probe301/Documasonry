@@ -37,7 +37,10 @@ def yaml_ordered_load(stream, Loader=None, object_pairs_hook=None):
 class Information:
   """docstring for Information"""
   def __init__(self, content):
-    self.content = content
+    if content is None:
+      self.content = OrderedDict()
+    else:
+      self.content = content
 
 
 
@@ -63,7 +66,11 @@ class Information:
 
 
   def __str__(self):
-    return '\n'.join('{}: {}'.format(k, v) for k, v in self.content.items())
+    text = '\n  '.join('{}: {}'.format(k, v) for k, v in self.content.items())
+    if text.strip():
+      return '<Information>\n  {}'.format(text)
+    else:
+      return '<Information>\n  {}'.format('(empty)')
 
 
 
@@ -110,6 +117,16 @@ def test_info_string():
   print(str(info))
 
 
+
+def test_info_string_empty():
+
+  text = '''
+  # 单位名称: 测试单位ANSI
+
+
+  '''
+  info = Information.from_string(text)
+  print(str(info))
 
 
 
