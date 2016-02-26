@@ -143,9 +143,11 @@ def test_figlet():
 
   from pylon import generate_figlet
 
-  generate_figlet('excelfiller', fonts=['space_op', ])
-  generate_figlet('wordfiller', fonts=['space_op', ])
-  generate_figlet('ry', fonts=['space_op', ])
+  text = 'hedingassistor assistor'.split(' ')
+
+  for word in text:
+    generate_figlet(word, fonts=['space_op', ])
+
 
 
 

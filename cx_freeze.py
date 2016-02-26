@@ -5,7 +5,7 @@ from cx_Freeze import setup, Executable
 
 
 
-version = '1.1'
+version = '2.0'
 app_name = 'Documasonry'
 icon = 'icon.ico'
 description = "Documasonry - Multiple documents generating tool"
