@@ -12,6 +12,8 @@
 
 
 import os
+import time
+import re
 
 import yaml
 from collections import OrderedDict
@@ -41,6 +43,26 @@ class Information:
       self.content = OrderedDict()
     else:
       self.content = content
+
+    self.add_date()
+
+
+  def get(self, key):
+    return self.content.get(key)
+  def add_date(self, date_value=None):
+    date_string = date_value or str(time.strftime('%Y:%m:%d'))
+    year, month, day = re.split(r'\:|\.|\-', date_string)
+    # cases = {'年': year, 'year': year, 'Y': year, 'y': year,
+    #          '月': month, 'month': month, 'M': month, 'm': month,
+    #          '日': day, 'day': day, 'D': day, 'd': day}
+    date_dict = {'current_date': date_string,
+                 'current_date_cn': '{}年{}月{}日'.format(year, month, day),
+                 'current_year': year,
+                 'current_month': month,
+                 'current_day': day
+                 }
+    self.content.update(date_dict)
+
 
 
 

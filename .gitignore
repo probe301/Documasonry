@@ -21,3 +21,5 @@ reference/
 Documasonry_bak/
 test/test_output/
 test_hidden/
+templates_hidden/
+documasonry_work.py

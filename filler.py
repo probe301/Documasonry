@@ -52,19 +52,19 @@ class Filler(AutoDelegator):
       excel = win32com.client.Dispatch('Excel.Application')
       # excel.Visible = False
       self.app_name = 'Office Excel'
-      filler = ExcelFiller(template_path, output_folder, app=excel)
+      filler_app = ExcelFiller(template_path, output_folder, app=excel)
     elif template_path.endswith(('.doc', '.docx')):
       word = win32com.client.Dispatch('Word.Application')
       # word.Visible = False
       self.app_name = 'Office Word'
-      filler = WordFiller(template_path, output_folder, app=word)
+      filler_app = WordFiller(template_path, output_folder, app=word)
     elif template_path.endswith(('.dwg', '.dxf')):
       cad = win32com.client.Dispatch('AutoCAD.Application')
       # cad.Visible = False
       self.app_name = 'Autodesk AutoCAD'
-      filler = AutoCADFiller(template_path, output_folder, app=cad)
+      filler_app = AutoCADFiller(template_path, output_folder, app=cad)
 
-    self.delegates = [filler] # delegates render and detect_required_filds
+    self.delegates = [filler_app] # delegates render and detect_required_filds
 
 
   def __str__(self):
@@ -344,6 +344,26 @@ def test_jinja():
 
 
 
+def test_jinja_edge_cases():
+  from information import Information
+  text = '''
+    codes: 1231234000050280000
+    borders: 空地;空地;空地;空地
+  '''
+  template = '''
+    {{(codes | string)[12:15]}}-01
+    {{(codes | string)[12:15]}}-01
+  '''
+
+  info = Information.from_string(text)
+  t = Template(template)
+  result = t.render(**info.content)
+  result | puts()
+
+
+
+
+
 
 
 
@@ -601,7 +621,7 @@ class AutoCADFiller:
   def render(self, info):
     self.info = info
     self.app.Visible = True
-    if self.info.content['target_position']:
+    if self.info.get('target_position'):
       # 如含有 target_position 字段 编辑前需要调整模板全体 object 位置
       target_position = self.info.content['target_position']
       if isinstance(target_position, list) and len(target_position) == 4:

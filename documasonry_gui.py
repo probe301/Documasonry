@@ -198,7 +198,6 @@ class DragInArea:
                accept_exts=['txt', 'py'], accept_single_path=False,
                hover_color='edefff', normal_color='ffffff',
                callback=lambda x: print(x.selecting)
-
                ):
     self.widget = getattr(main_window.ui, widget_id)
     self.widget_id = widget_id
