@@ -151,6 +151,25 @@ def test_info_string_empty():
   print(str(info))
 
 
+def test_info_string_in_list():
+
+  text = '''
+
+    项目名称: test1
+    单位名称: test2
+    points_x[]: [100.1, 100.2, 100.3, 100.4]
+    points_y[]: [200.1, 200.2, 200.3, 200.4]
+    lengths[]: [10, 15, 20, 30]
+    radius[]: [0, 0, 5.5, 0]
+    日期: today
+
+
+  '''
+  info = Information.from_string(text)
+  print(str(info))
+  print(info.content)
+
+
 
 
 
@@ -165,7 +184,7 @@ def test_figlet():
 
   from pylon import generate_figlet
 
-  text = 'hedingassistor assistor'.split(' ')
+  text = 'word excel autocad'.split(' ')
 
   for word in text:
     generate_figlet(word, fonts=['space_op', ])
