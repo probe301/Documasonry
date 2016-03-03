@@ -13,7 +13,7 @@ from pylon import datalines
 
 
 
-class NoInfoKeyError(Exception):
+class InfoKeyError(Exception):
   pass
 
 class SaveDocumentError(Exception):
@@ -22,8 +22,10 @@ class SaveDocumentError(Exception):
 class AutoCADCustomFieldError(Exception):
   pass
 
-class ExcelFieldError(Exception):
+class ExcelCustomFieldError(Exception):
   pass
+
+
 
 
 def extract_field(field):
@@ -177,7 +179,7 @@ class WordFiller:
       val = evalute_field(field=field, info=info)
       # puts('val')
       if val in (None, ''):
-        raise NoInfoKeyError('无法找到字段的值 {}'.format(field))
+        raise InfoKeyError('无法找到字段的值 {}'.format(field))
 
 
       while text_range.Find.Execute(field, False, False, False, False, False, True, 0, True, val, 2):
@@ -391,19 +393,29 @@ def test_jinja_edge_cases():
 
 class ExcelFiller:
   '''
-  特殊字段
-  - insert list data
+  单元格式由 excel 控制
 
-  yaml_text =
+  特殊字段: 提供数据列表, 自动换行填写
+
+  Excel 文档有sheet标签
+  填充顺序应该是
+  sheet1 内容字段 -> sheet1 标签字段 -> 文件名的字段 ->
+  备份 sheet1 -> sheet1 列表字段 -> 若剩余列表元素 备份sheet2 填充sheet2列表字段
+                                -> 若不剩余列表元素 删除sheet2
+
+
+  yaml_text 形如
     项目名称: test1
     单位名称: test2
     points_x: [100.1, 100.2, 100.3, 100.4]  # 数据为列表
     points_y: [200.1, 200.2, 200.3, 200.4]
     lengths: [10, 15, 20, 30]
     radius: [0, 0, 5.5, 0]
+    label: normal
 
   template excel cell label =
-    {points_x[20]} # [20] 表示本页最多容纳20行, 对应数据必须为列表
+    {points_x[20]} # [20] 表示本页最多容纳20行, 对应数据需为列表,
+                   # todo 不是列表则重复填写该数值
     {points_y[20]}
     {lengths[15]}
 
@@ -474,11 +486,11 @@ class ExcelFiller:
       # puts('field_text field_label field_max_length')
       value_list = info.get(field_label)
       if value_list is None:
-        raise NoInfoKeyError('没有找到列表数据 <{}>'.format(field_label))
+        raise InfoKeyError('没有找到列表数据 <{}>'.format(field_label))
       if isinstance(value_list, str) or not isinstance(value_list, list):
-        raise NoInfoKeyError('列表数据 <{}> 的值必须为数组/序列'.format(field_label))
+        raise InfoKeyError('列表数据 <{}> 的值必须为数组/序列'.format(field_label))
       if field_max_length < len(value_list):
-        raise ExcelFieldError('无法填充序列 <{}> 表格容量太小({}), 数据过多({})'.format(field_text, field_max_length, len(value_list)))
+        raise ExcelCustomFieldError('无法填充序列 <{}> 表格容量太小({}), 数据过多({})'.format(field_text, field_max_length, len(value_list)))
 
       row = cell.Row
       col = cell.Column
@@ -574,21 +586,41 @@ def test_excel_fill_subtable():
   text = '''
     项目名称: 测试项目名称
     date: 20150101
-    姓名: [100.1, 100.2, 100.3, 100.4]
-    年龄: [1,2,3,1,4,1,2,4,1,1,2,3,None,4,]
-    电话: [200.1, 200.2, 200.3, 200.4]
+    姓名: [甫红霞, 延红, 龚淑英, 荆旭, 葛丹, 闻帆, 佴旭, 於佳, 桑桂兰, 公利]
+    年龄: [21, 22, 23, 21, 24, 21, 22, 24, '', 24,]
+    电话: [18615829116, 15707733513, 14547003044, 14526931238, 14567186314, 13683554632, 13064008827, 18994624274, 18863516101, 14517791705]
   '''
   info = Information.from_string(text)
   t1 = relative_path('test/test_templates/{{项目名称}}-索引表.xls')
-
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
-
   filler.render(info=info)
   # filler.save(info=info, close=False)
 
 
 
+def test_fake_id_generator():
+  from faker import Factory
+  fake = Factory.create('zh_CN')
+  for i in range(10):
+    fake.profile() | puts()
+    fake.phone_number() | puts()
 
+
+
+
+
+def test_excel_sheet_management():
+  tmpl_path = 'test/Filler/test_array_field.xls'
+  workspace = os.getcwd() + '/test/Filler'
+  filler = ExcelFiller(Content(), os.path.abspath(tmpl_path), workspace)
+  filler.open()
+  sheet = filler.sheet(0)
+  print(sheet)
+
+  filler.copy_sheet(source=0, after=0, label='1')
+  filler.copy_sheet(source=0, after=1, label='2')
+  filler.copy_sheet(source=0, after=-1, label='3')
+  filler.copy_sheet(source=0, after=-2, label='4')
 
 
 
@@ -614,8 +646,11 @@ def test_excel_fill_subtable():
 ##   ##  #####     ##   #####   ###### ##   ## ######
 
 class AutoCADFiller:
-  """ AutoCAD filler 特殊 method / field
-  - insert block {{地形}} to back layer
+  """ AutoCAD filler
+
+  特殊字段
+
+  - 字段为 {{地形dwg}} 时插入dwg图块
   - 位置校正
     原始模板在(0, 0)处 需要调整到界址线图形所在位置
     polygon边框确定:
@@ -625,13 +660,9 @@ class AutoCADFiller:
       方形 ? 边界框长边 + padding : 边界框长边短边分别 + padding
 
   yaml_text = '''
-    项目名称: test1
-    单位名称: test2
-    地籍号: 110123122
-    name: sjgisdgd
-    面积90: 124.1
-    面积80: 234.2
-    宗地dwg: zd.dwg
+    项目名称: test项目
+    单位名称: test单位
+    面积: 1234.1
     地形dwg: dx.dwg
     日期: today
   '''
@@ -716,7 +747,7 @@ class AutoCADFiller:
     for en in self.text_entities():
       val = evalute_field(field=en.TextString, info=info)
       if val in (None, ''):
-        raise NoInfoKeyError('无法找到字段的值 {}'.format(en.TextString))
+        raise InfoKeyError('无法找到字段的值 {}'.format(en.TextString))
 
       if en.TextString.startswith('{{') and en.TextString.endswith('dwg}}'):
         # block field syntax should insert dwg block
@@ -832,7 +863,7 @@ def test_cad_filler_render():
   filler.save(info=info, close=True)
 
   # TODO: if templates tring has multiple field and just missing 1 value,
-  # in this case it cannot catch 'NoInfoKeyError'
+  # in this case it cannot catch 'InfoKeyError'
   # template '{{a}}:::{{b}}' a=null, b= test -> ':::test' no raise exception here!
 
 

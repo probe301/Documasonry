@@ -1,11 +1,11 @@
 
 
 from pylon import puts
-import re
+# import re
 import os
 
-import time
-from pylon import datalines
+# import time
+# from pylon import datalines
 import pylon
 
 from filler import Filler
@@ -13,11 +13,6 @@ from information import Information
 
 
 
-######   #####   ###### ##   ## ##   ##  #####   ######  #####  ##   ## ######  ##   ##
-##   ## ##   ## ###     ##   ## ### ### ##   ## ##      ##   ## ###  ## ##   ## ##   ##
-##   ## ##   ## ##      ##   ## ## # ## #######  #####  ##   ## ## # ## ######   #####
-##   ## ##   ## ###     ##   ## ##   ## ##   ##      ## ##   ## ##  ### ##  ##     ##
-######   #####   ######  #####  ##   ## ##   ## ######   #####  ##   ## ##   ##    ##
 
 
 class Documasonry:
