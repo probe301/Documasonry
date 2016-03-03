@@ -398,27 +398,23 @@ class ExcelFiller:
   特殊字段: 提供数据列表, 自动换行填写
 
   Excel 文档有sheet标签
-  填充顺序应该是
-  sheet1 内容字段 -> sheet1 标签字段 -> 文件名的字段 ->
-  备份 sheet1 -> sheet1 列表字段 -> 若剩余列表元素 备份sheet2 填充sheet2列表字段
-                                -> 若不剩余列表元素 删除sheet2
-
+  填充顺序是
+  填充sheet1内容字段 -> 填充sheet1标签字段 -> 备份sheet1
+  -> 填充sheet1列表字段 -> 若剩余列表元素 备份sheet2 填充sheet2列表字段
+                        -> 若不剩余列表元素 删除sheet2
+  -> 存档时填充文件名的字段
 
   yaml_text 形如
     项目名称: test1
     单位名称: test2
-    points_x: [100.1, 100.2, 100.3, 100.4]  # 数据为列表
-    points_y: [200.1, 200.2, 200.3, 200.4]
-    lengths: [10, 15, 20, 30]
-    radius: [0, 0, 5.5, 0]
-    label: normal
+    pointsxlist: [100.1, 100.2, 100.3, 100.4]
+    pointsylist: [200.1, 200.2, 200.3, 200.4]
+    lengthslist: [10, 15, 20, 30]
+    radiuslist: 'R=20m'
 
-  template excel cell label =
-    {points_x[20]} # [20] 表示本页最多容纳20行, 对应数据需为列表,
-                   # todo 不是列表则重复填写该数值
-    {points_y[20]}
-    {lengths[15]}
-
+    字段末尾为'list' 时数据一般为列表
+    字段末尾为'list' 但数据为文本, 数字时,
+    将自动转为重复n次的列表, n为数据中最大长度的list
   '''
   def __init__(self, template_path, output_folder, app):
     self.template_path = template_path
@@ -433,6 +429,9 @@ class ExcelFiller:
     for cell in self.field_cells(sheet):
       for match in re.findall(r'{{.+?}}', cell.Value):
         field_names.append(match)
+    for match in re.findall(r'{{.+?}}', sheet.Name):  # sheet name 中的字段
+      field_names.append(match)
+
     if close:
       self.document.Close()
     if unique:
@@ -448,47 +447,68 @@ class ExcelFiller:
     for cell in sheet.UsedRange.Cells:
       yield cell
 
-
-  def field_cells(self, sheet):
+  def field_cells(self, sheet, normal_cell=True, list_cell=True):
     for cell in self.used_cells(sheet):
       value = str(cell.Value)
       if value and re.match(r'.*?{{.+?}}', value):
-        # puts(value)
-        yield cell
+        if list_cell and value.endswith('list}}'):
+          yield cell
+        elif normal_cell and not value.endswith('list}}'):
+          yield cell
 
 
   def render(self, info):
     self.info = info
     self.app.Visible = True
     sheet = self.document.WorkSheets.Item(1)
-    for cell in self.field_cells(sheet):
+    for cell in self.field_cells(sheet, list_cell=False): # 此时不填list字段
       cell_string = cell.Value
       cell.Value = evalute_field(cell_string, info)
-    self.fill_array_cells(info)
 
-  def array_cells(self, sheet):
-    '''返回所有需填充array的单元格'''
-    for cell in self.used_cells(sheet):
-      value = cell.Value
-      if value and re.match(r'.*?\{.+\}', str(value)):
-        if '[' in value and ']' in value:
-          # puts('array_cells_ value')
-          yield cell
+    self.fill_list_cells(info, sheet) # 填充 list 字段
+    self.fill_sheet_label(info, sheet) # 填充 sheet name
 
 
-  def fill_array_cells(self, info):
+  def fill_sheet_label(self, info, sheet):
+    sheet.Name = evalute_field(sheet.Name, info)
+
+
+  def list_cells_max_length(self, sheet, default=10):
+    # 记录在 sheet label 中 list=n
+    # 例如 'Sheet1{#list=15#}'
+    # 可以放在 jinja 风格注释中, 填充后会自动去掉该部分文字, 剩下 'Sheet1'
+    match = re.search(r'(?<=list\=)\d+', sheet.Name)
+    if match:
+      return int(match.group(0))
+    else:
+      return default
+
+  def info_data_max_length(self, info):
+    result = []
+    for k, v in info.content.items():
+      if k.endswith('list'):
+        if isinstance(v, list) and not isinstance(v, str):
+          result.append(len(v))
+    if result:
+      return max(result)
+    else:
+      return 0
+
+
+  def fill_list_cells(self, info, sheet):
     '''填充列表部分, 单元格可能是普通的, 可能是纵向合并过的'''
-    sheet = self.document.Worksheets.Item(1)
-    for cell in list(self.array_cells(sheet)):
-      field_text = cell.Value
-      field_label = field_text.split('[')[0][1:]
-      field_max_length = int(field_text.split('[')[1][:-2])
-      # puts('field_text field_label field_max_length')
-      value_list = info.get(field_label)
+    for cell in list(self.field_cells(sheet, normal_cell=False)):
+      field_text = cell.Value[2:-2]
+      field_max_length = self.list_cells_max_length(sheet)
+      value_list = info.get(field_text)
       if value_list is None:
-        raise InfoKeyError('没有找到列表数据 <{}>'.format(field_label))
-      if isinstance(value_list, str) or not isinstance(value_list, list):
-        raise InfoKeyError('列表数据 <{}> 的值必须为数组/序列'.format(field_label))
+        raise InfoKeyError('没有找到列表数据 <{}>'.format(field_text))
+      if isinstance(value_list, (str, int, float)):
+        value_list = [value_list] * self.info_data_max_length(info)
+      elif isinstance(value_list, list):
+        pass
+      else:
+        raise InfoKeyError('列表数据 <{}> 的值必须为数组/序列'.format(field_text))
       if field_max_length < len(value_list):
         raise ExcelCustomFieldError('无法填充序列 <{}> 表格容量太小({}), 数据过多({})'.format(field_text, field_max_length, len(value_list)))
 
@@ -512,7 +532,7 @@ class ExcelFiller:
       after += self.document.WorkSheets.Count
     original_sheet.Copy(None, self.get_sheet(after))
     # VBA 接受 Before After 两种参数
-    # python 调用时不能用关键字参数, 必须按照位置传递
+    # Python 调用时不能用关键字参数, 必须按照位置传递
     new_sheet = self.get_sheet(after+1)
     new_sheet.name = label
     return new_sheet
@@ -543,9 +563,7 @@ def test_excel_filler_render():
     name: 测试单位name
     项目名称: 测试项目
     项目编号: 2015-项目编号-001
-    面积90: 12345.600
-    面积80: 12345.300
-    地籍号: 1234567890010010000
+    面积: 12345.600
     四至: 测试路1;测试街2;测试路3;测试街4
     土地坐落: 测试路以东,测试街以南
     area: 1000
@@ -564,9 +582,7 @@ def test_excel_filler_render_and_save():
     name: 测试单位name
     项目名称: 测试项目
     项目编号: 2015-项目编号-001
-    面积90: 12345.600
-    面积80: 12345.300
-    地籍号: 1234567890010010000
+    面积: 12345.600
     四至: 测试路1;测试街2;测试路3;测试街4
     土地坐落: 测试路以东,测试街以南
     area: 1000
@@ -583,40 +599,32 @@ def test_excel_fill_subtable():
   from information import Information
   from pylon import relative_path
 
+  # from faker import Factory
+  # fake = Factory.create('zh_CN')
+  # for i in range(10):
+  #   fake.profile() | puts()
+  #   fake.phone_number() | puts()
   text = '''
     项目名称: 测试项目名称
     date: 20150101
-    姓名: [甫红霞, 延红, 龚淑英, 荆旭, 葛丹, 闻帆, 佴旭, 於佳, 桑桂兰, 公利]
-    年龄: [21, 22, 23, 21, 24, 21, 22, 24, '', 24,]
-    电话: [18615829116, 15707733513, 14547003044, 14526931238, 14567186314, 13683554632, 13064008827, 18994624274, 18863516101, 14517791705]
+    姓名list: [甫红, 延红, 龚淑, 荆旭, 葛丹, 闻帆, 佴旭, 於佳, 桑桂, 公利]
+    年龄list: 20.1
+    电话list: [18615829116, '', 14547003044, '', 14567186314, 13683554632, 13064008827, '', '', 14517791705]
   '''
+  # 年龄list: 模板单元格格式为0位小数, 将自动显示为整数
   info = Information.from_string(text)
   t1 = relative_path('test/test_templates/{{项目名称}}-索引表.xls')
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=info)
-  # filler.save(info=info, close=False)
-
-
-
-def test_fake_id_generator():
-  from faker import Factory
-  fake = Factory.create('zh_CN')
-  for i in range(10):
-    fake.profile() | puts()
-    fake.phone_number() | puts()
-
-
 
 
 
 def test_excel_sheet_management():
-  tmpl_path = 'test/Filler/test_array_field.xls'
-  workspace = os.getcwd() + '/test/Filler'
-  filler = ExcelFiller(Content(), os.path.abspath(tmpl_path), workspace)
-  filler.open()
-  sheet = filler.sheet(0)
+  from pylon import relative_path
+  template_path = relative_path('test/test_templates/_test_{{项目名称}}-申请表.xls')
+  filler = Filler(template_path, output_folder=relative_path('/test/test_output'))
+  sheet = filler.get_sheet(0)
   print(sheet)
-
   filler.copy_sheet(source=0, after=0, label='1')
   filler.copy_sheet(source=0, after=1, label='2')
   filler.copy_sheet(source=0, after=-1, label='3')
