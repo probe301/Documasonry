@@ -2,6 +2,7 @@
 
 a : 123
 b: [foo, bar]
-default: !include '测试单位.inf'
+default: !include 't1.inf'
 c: test
 
+test: !include t2.yaml

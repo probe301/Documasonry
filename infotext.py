@@ -41,9 +41,11 @@ class IncludeOrderedLoader(yaml.Loader):
   def _include(self, loader, node):
     filename = os.path.join(self._root, self.construct_scalar(node))
     try:
-      f = open(filename, 'r', encoding='utf-8')
+      f = open(filename, 'r', encoding='utf-8').read()
+      encoding = 'utf-8'
     except UnicodeDecodeError:
-      f = open(filename, 'r', encoding='gbk')
+      encoding = 'gbk'
+    f = open(filename, 'r', encoding=encoding)
     return yaml.load(f, IncludeOrderedLoader)
 
   def _construct_mapping(self, loader, node):
@@ -63,7 +65,32 @@ def yaml_load(stream, loader=None):
 
 
 class InfoText:
-  """docstring for InfoText"""
+  """ InfoText
+
+  存放解析文本形式的键值对信息
+  基于 yaml 但对格式更加宽容
+
+  例
+      name: foo
+      age: 56
+      语言: 中文
+      # 此行为注释
+      phone: [12312412, 21414124]
+
+  可以用 utf8 gbk 编码存储
+  每个键值对之间可以用冒号, 也可以用等号, 周围空格不强制要求
+
+  例
+      name=foo
+      age :56
+      语言 = 中文
+      # 此行为注释
+      phone : [12312412, 21414124]
+
+  """
+
+
+
   @classmethod
   def from_yaml(cls, path):
     try:
@@ -193,8 +220,6 @@ def test_info_string_spec():
   单位名称: 测试单位
   项目名称: 测试项目
   面积: 10000.11
-  四至: 测试路1;测试街2;测试路3;测试街4
-  土地坐落: 测试路以东,测试街以南
   '''
   info = InfoText.from_string(text)
   print(str(info))
@@ -202,7 +227,7 @@ def test_info_string_spec():
 
 def test_info_string_empty():
   text = '''
-  # 单位名称: 测试单位ANSI
+  # comment: comment
 
   '''
   info = InfoText.from_string(text)
@@ -211,9 +236,12 @@ def test_info_string_empty():
 
 def test_info_string_some_not_space_after_colon():
   text = '''
-  单位名称 =测试单位
-  项目名称: 测试项目
-  土地坐落:测试路以东,测试街以南
+  name=foo
+  age :56
+  语言 = 中文
+  # 此行为注释
+  phone : [12312412, 21414124]
+
   '''
   info = InfoText.from_string(text)
   print(str(info))
@@ -221,64 +249,54 @@ def test_info_string_some_not_space_after_colon():
 
 def test_info_string_in_list():
   text = '''
-    项目名称: test1
-    单位名称: test2
     points_x[]: [100.1, 100.2, 100.3, 100.4]
     points_y[]: [200.1, 200.2, 200.3, 200.4]
-    lengths[]: [10, 15, 20, 30]
-    radius[]: [0, 0, 5.5, 0]
-    日期: today
   '''
   info = InfoText.from_string(text)
   print(str(info))
 
 
-
-
-def test_info_include_by_yaml_load():
+def test_info_nested_by_yaml_load():
   path = os.getcwd() + '/test/nested.inf'
   info = InfoText.from_yaml(path)
-
   puts(info)
-
-
+  print('----')
+  puts(info.content)
+  print('----')
+  print(yaml.dump(info.content))
 
 
 def test_info_additional_keys():
   path = os.getcwd() + '/test/nested.inf'
   info = InfoText.from_yaml(path)
-
-  puts(info)
+  puts(info.content)
   print(info.get('a'))
   print(info.get('ErrorKey'))
-  print(info.get('单位名称'))      # from key<default>
-  print(info.get('current_date'))  # key<default> contains this (1999.9.9)
-  print(info.get('current_year'))  # key<default> does not contain this,
+  print(info.get('foo'))           # from key<default>
+  print(info.get('current_year'))  # key<default> contains this 1404
+  print(info.get('current_date'))  # key<default> does not contain this,
                                    # use todays date
 
 
 
-def test_infotext_combine():
+def test_infotext_merge():
 
   text1 = '''
-  单位名称 =测试单位
-  项目名称: 测试项目
+  单位名称 =name1
+  项目名称: name2
   key1:
   key2:
-  key3: 333
-  土地坐落:测试路以东,测试街以南
+  key3: 456
+
   '''
   info1 = InfoText.from_string(text1)
 
   text2 = '''
-    项目名称: test1
-    单位名称: test2
+    项目名称: change1
+    单位名称: change2
     key1:
     key2: 123
     key3:
-    points_x[]: [100.1, 100.2, 100.3, 100.4]
-
-    日期: today
   '''
   info2 = InfoText.from_string(text2)
   print(str(info1))
@@ -305,7 +323,3 @@ def test_mkdir():
   import os
   os.mkdir('33/11/22')
 
-
-def test_help():
-  import io
-  help(io.StringIO)

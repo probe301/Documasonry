@@ -1,0 +1,6 @@
+
+
+foo: bar
+中文GBK: 中文GBK
+t1_key: !include t3.yaml
+current_year: 1404

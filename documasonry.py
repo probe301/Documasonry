@@ -16,7 +16,7 @@ from infotext import InfoText
 
 
 class Documasonry:
-  """docstring for Documasonry
+  """Documasonry
 
   yaml basic config
   GUI
@@ -38,13 +38,9 @@ class Documasonry:
   yaml_text = '''
               项目名称: test1
               单位名称: test2
-              地籍号: 110123122
-              name: sjgisdgd
-              面积90: 124.1
-              面积80: 234.2
-              zdfile: zd.dwg
               地形file: dx.dwg  # relative path for output_folder
-              日期: today
+              日期:             # default today
+
               '''
 
   """
