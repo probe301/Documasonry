@@ -1,0 +1,7 @@
+
+
+a : 123
+b: [foo, bar]
+default: !include '测试单位.inf'
+c: test
+

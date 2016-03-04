@@ -204,8 +204,8 @@ def test_word_filler_detect_fields():
 
   t1 = os.getcwd() + '/test/test_templates/test_{{name}}_面积计算表.doc'
   t2 = os.getcwd() + '/test/test_templates/test_no_field_面积计算表.doc'
-  from information import Information
-  yaml_info = Information.from_yaml(os.getcwd() + '/test/测试单位.inf')
+  from infotext import InfoText
+  yaml_info = InfoText.from_yaml(os.getcwd() + '/test/测试单位.inf')
 
 
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
@@ -229,7 +229,7 @@ def test_word_filler_render():
 
   t1 = os.getcwd() + '/test/test_templates/test_{{name}}_面积计算表.doc'
   t2 = os.getcwd() + '/test/test_templates/test_no_field_面积计算表.doc'
-  from information import Information
+  from infotext import InfoText
 
   text = '''
     单位名称: 测试单位
@@ -245,7 +245,7 @@ def test_word_filler_render():
     已设定值: value
   '''
 
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
 
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.detect_required_fields(unique=False) | puts()
@@ -261,7 +261,7 @@ def test_word_filler_render():
 def test_word_filler_render_and_save():
 
   t1 = os.getcwd() + '/test/test_templates/test_{{name}}_面积计算表.doc'
-  from information import Information
+  from infotext import InfoText
   text = '''
     单位名称: 测试单位
     name: 测试单位name
@@ -275,7 +275,7 @@ def test_word_filler_render_and_save():
     area: 1000
     已设定值: value
   '''
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
 
   filler.render(info=info)
@@ -291,7 +291,7 @@ def test_word_filler_render_and_save():
 def test_jinja():
 
 
-  from information import Information
+  from infotext import InfoText
 
   text = '''
     单位名称: 测试单位
@@ -305,7 +305,7 @@ def test_jinja():
     area: 1000
     已设定值: value
   '''
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
 
 
 
@@ -348,7 +348,7 @@ def test_jinja():
 
 
 def test_jinja_edge_cases():
-  from information import Information
+  from infotext import InfoText
   text = '''
     codes: 1231234000050280000
     borders: 空地;空地;空地;空地
@@ -358,7 +358,7 @@ def test_jinja_edge_cases():
     {{(codes | string)[12:15]}}-01
   '''
 
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
   t = Template(template)
   result = t.render(**info.content)
   result | puts()
@@ -458,6 +458,9 @@ class ExcelFiller:
 
 
   def render(self, info):
+    ''' 填充单元格内普通字段
+        填充列表字段
+        填充sheet label可能有的字段 '''
     self.info = info
     self.app.Visible = True
     sheet = self.document.WorkSheets.Item(1)
@@ -482,6 +485,7 @@ class ExcelFiller:
       return int(match.group(0))
     else:
       return default
+
 
   def info_data_max_length(self, info):
     result = []
@@ -557,7 +561,7 @@ def test_excel_filler_detect_fields():
 
 def test_excel_filler_render():
   t1 = os.getcwd() + '/test/test_templates/_test_{{项目名称}}-申请表.xls'
-  from information import Information
+  from infotext import InfoText
   text = '''
     单位名称: 测试单位
     name: 测试单位name
@@ -569,14 +573,14 @@ def test_excel_filler_render():
     area: 1000
     已设定值: value
   '''
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=info)
 
 
 def test_excel_filler_render_and_save():
   t1 = os.getcwd() + '/test/test_templates/_test_{{项目名称}}-申请表.xls'
-  from information import Information
+  from infotext import InfoText
   text = '''
     单位名称: 测试单位
     name: 测试单位name
@@ -588,7 +592,7 @@ def test_excel_filler_render_and_save():
     area: 1000
     已设定值: value
   '''
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
 
   filler.render(info=info)
@@ -596,7 +600,7 @@ def test_excel_filler_render_and_save():
 
 
 def test_excel_fill_subtable():
-  from information import Information
+  from infotext import InfoText
   from pylon import relative_path
 
   # from faker import Factory
@@ -612,7 +616,7 @@ def test_excel_fill_subtable():
     电话list: [18615829116, '', 14547003044, '', 14567186314, 13683554632, 13064008827, '', '', 14517791705]
   '''
   # 年龄list: 模板单元格格式为0位小数, 将自动显示为整数
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
   t1 = relative_path('test/test_templates/{{项目名称}}-索引表.xls')
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=info)
@@ -853,7 +857,7 @@ def test_cad_filler_detect_fields():
 
 def test_cad_filler_render():
   t1 = os.getcwd() + '/test/test_templates/test_{{测试单位}}-宗地图.dwg'
-  from information import Information
+  from infotext import InfoText
   text = '''
     测试单位: 测试单位name
     # title: testtitle
@@ -865,7 +869,7 @@ def test_cad_filler_render():
     area90: 234.5
     地籍号: 10939512
   '''
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=info)
   filler.save(info=info, close=True)
@@ -894,7 +898,7 @@ def test_cad_filler_insert_block():
 
 
 def test_cad_filler_insert_block_from_yaml_config_relative_path():
-  from information import Information
+  from infotext import InfoText
   text = '''
     测试单位: 测试单位name
     # title: testtitle
@@ -907,7 +911,7 @@ def test_cad_filler_insert_block_from_yaml_config_relative_path():
     地籍号: 10939512
     地形file: ../test_templates/dixing.dwg
   '''
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
   t1 = os.getcwd() + '/test/test_templates/test_cad_insert_block.dwg'
   filler = Filler(template_path=t1, output_folder=os.getcwd() + '/test/test_output')
   filler.render(info=info)

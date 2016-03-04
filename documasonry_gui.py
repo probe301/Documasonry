@@ -11,7 +11,7 @@ import html
 import urllib.parse
 import logging
 from filler import Filler
-from information import Information
+from infotext import InfoText
 from documasonry import Documasonry
 from PyQt4 import QtCore, QtGui, uic
 from PyQt4.QtGui import (QApplication, QMessageBox, QCheckBox, QFileDialog, QWidget)
@@ -434,7 +434,7 @@ class DocumasonryGUI(QWidget, QCommonTools, QLogger):
 
     info_text = self.info_textedit.toPlainText()
     need_index = self.add_index_checker.isChecked()
-    msr.generate(info=Information.from_string(info_text),
+    msr.generate(info=InfoText.from_string(info_text),
                  save=True,
                  add_index=need_index)
 

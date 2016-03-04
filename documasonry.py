@@ -9,7 +9,7 @@ import os
 import pylon
 
 from filler import Filler
-from information import Information
+from infotext import InfoText
 
 
 
@@ -107,10 +107,10 @@ class Documasonry:
 
   def combine_fields_info_text(self, info1_text, info2_text):
     # result = ''
-    info1 = Information.from_string(info1_text).content
-    info2 = Information.from_string(info2_text).content
-    info1.update(info2)
-    return '\n' + ''.join('{}: {}\n'.format(k, v) for k, v in info1.items())
+    info1 = InfoText.from_string(info1_text)
+    info2 = InfoText.from_string(info2_text)
+    info1.merge(info2)
+    return info1.to_yaml_string()
 
 
 
@@ -130,7 +130,7 @@ class Documasonry:
     required_fields 如不配置, 则需要用 filler.detect_required_fields() 检测出
     '''
     path = os.getcwd() + '/config.yaml'
-    config = Information.from_yaml(path).content
+    config = InfoText.from_yaml(path).content
     # config | puts(max_depth=10)
     for i, item in enumerate(config['default_templates']):
       file_path = item['file']
@@ -198,7 +198,7 @@ def test_documasonry_generate():
          area80: 94923
          area90: 3257
          '''
-  info = Information.from_string(text)
+  info = InfoText.from_string(text)
   masonry.generate(info=info, save=True, add_index=True) | puts()
 
 
@@ -227,23 +227,21 @@ def test_detect_fields():
 
 def test_combine_fields_info_text():
   info1_text = '''
-    面积90: 20.1
-    项目名称:
+    项目名称: org
     单位名称:
-    面积80:
+    code: 110123122
+
   '''
   info2_text = '''
-    项目名称: test1
-    单位名称:
-    地籍号: 110123122
-    name: sjgisdgd
-    面积90: 124.1
-    面积80: 234.2
+    项目名称: new
+    单位名称: name
+    code:
     area: 124.2
   '''
 
   d = Documasonry()
   r = d.combine_fields_info_text(info1_text, info2_text)
+  puts('----')
   puts(r)
 
 
@@ -262,6 +260,7 @@ def test_combine_fields_info_text():
 
   d = Documasonry()
   r = d.combine_fields_info_text(info1_text, info2_text)
+  puts('----')
   puts(r)
 
 
@@ -277,4 +276,5 @@ def test_combine_fields_info_text():
 
   d = Documasonry()
   r = d.combine_fields_info_text(info1_text, info2_text)
+  puts('----')
   puts(r)
