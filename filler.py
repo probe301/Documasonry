@@ -37,7 +37,11 @@ def extract_field(field):
 def evalute_field(field, info):
   # return info.content.get(field)
   template = Template(field)
-  return template.render(**info.content)
+  ast = Environment().parse(field)
+  variables = meta.find_undeclared_variables(ast)
+  d = {key: info.get(key) for key in variables}
+  return template.render(d)
+  # return template.render(**info.content)
 
 
 
@@ -903,7 +907,7 @@ def test_cad_filler_insert_block_from_yaml_config_relative_path():
     测试单位: 测试单位name
     # title: testtitle
     project: custom_project
-    date: 0160202
+    date: 20160202
     ratio: 1000
     landcode: 200
     area80: 123.4

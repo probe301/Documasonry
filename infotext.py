@@ -128,14 +128,28 @@ class InfoText:
       self.content = content
 
   def __str__(self):
-    text = '\n  '.join('{}: {}'.format(k, v) for k, v in self.content.items())
+    s = []
+    for k, v in self.content.items():
+      if isinstance(v, (int, float)) or (isinstance(v, str) and v[0].isdigit()):
+        s.append([k, repr(v)])
+      else:
+        s.append([k, v])
+    text = '\n  '.join('{}: {}'.format(k, v) for k, v in s)
     if text.strip():
       return '<InfoText>\n  {}'.format(text)
     else:
       return '<InfoText>\n  {}'.format('(empty)')
 
   def to_yaml_string(self):
-    return '\n'.join('{}: {}'.format(k, v) for k, v in self.content.items())
+    s = []
+    for k, v in self.content.items():
+      if isinstance(v, (int, float)) or (isinstance(v, str) and v[0].isdigit()):
+        s.append([k, repr(v)])
+      else:
+        s.append([k, v])
+    return '\n' + '\n'.join('{}: {}'.format(k, v) for k, v in s)
+
+
 
   def get(self, key):
     return self.content.get(key) or self.additional_key(key)
@@ -205,9 +219,6 @@ class InfoText:
 
 
 
-
-
-
 def test_info_yaml():
   info = InfoText.from_yaml(os.getcwd() + '/test/测试单位.inf')
   print(str(info))
@@ -215,26 +226,34 @@ def test_info_yaml():
   print(str(info))
 
 
+
 def test_info_string_spec():
+  from pyshould import should
   text = '''
   单位名称: 测试单位
   项目名称: 测试项目
   面积: 10000.11
   '''
   info = InfoText.from_string(text)
-  print(str(info))
+  str(info) | should.eq('''<InfoText>
+  单位名称: 测试单位
+  项目名称: 测试项目
+  面积: 10000.11''')
 
 
 def test_info_string_empty():
+  from pyshould import should
   text = '''
   # comment: comment
 
   '''
   info = InfoText.from_string(text)
-  print(str(info))
+  str(info) | should.eq('''<InfoText>
+  (empty)''')
   # print(info.content)
 
 def test_info_string_some_not_space_after_colon():
+  from pyshould import should
   text = '''
   name=foo
   age :56
@@ -244,16 +263,22 @@ def test_info_string_some_not_space_after_colon():
 
   '''
   info = InfoText.from_string(text)
-  print(str(info))
-  # print(info.content)
+  str(info) | should.eq('''<InfoText>
+  name: foo
+  age: 56
+  语言: 中文
+  phone: [12312412, 21414124]''')
 
 def test_info_string_in_list():
+  from pyshould import should
   text = '''
     points_x[]: [100.1, 100.2, 100.3, 100.4]
     points_y[]: [200.1, 200.2, 200.3, 200.4]
   '''
   info = InfoText.from_string(text)
-  print(str(info))
+  str(info) | should.eq('''<InfoText>
+  points_x[]: [100.1, 100.2, 100.3, 100.4]
+  points_y[]: [200.1, 200.2, 200.3, 200.4]''')
 
 
 def test_info_nested_by_yaml_load():
@@ -267,20 +292,22 @@ def test_info_nested_by_yaml_load():
 
 
 def test_info_additional_keys():
+  from pyshould import should
   path = os.getcwd() + '/test/nested.inf'
   info = InfoText.from_yaml(path)
   puts(info.content)
-  print(info.get('a'))
-  print(info.get('ErrorKey'))
-  print(info.get('foo'))           # from key<default>
-  print(info.get('current_year'))  # key<default> contains this 1404
-  print(info.get('current_date'))  # key<default> does not contain this,
-                                   # use todays date
+  info.get('a') | should.eq(123)
+  info.get('ErrorKey') | should.eq(None)
+  info.get('foo') | should.eq('bar')          # from key<default>
+  info.get('current_year') | should.eq(1404)  # key<default> contains this 1404
+  print(info.get('current_date'))             # key<default> does not contain this,
+                                              # use todays date
+
 
 
 
 def test_infotext_merge():
-
+  from pyshould import should
   text1 = '''
   单位名称 =name1
   项目名称: name2
@@ -290,7 +317,6 @@ def test_infotext_merge():
 
   '''
   info1 = InfoText.from_string(text1)
-
   text2 = '''
     项目名称: change1
     单位名称: change2
@@ -299,11 +325,27 @@ def test_infotext_merge():
     key3:
   '''
   info2 = InfoText.from_string(text2)
-  print(str(info1))
-  print(str(info2))
+
+  str(info1) | should.eq('''<InfoText>
+  单位名称: name1
+  项目名称: name2
+  key1: None
+  key2: None
+  key3: 456''')
+  str(info2) | should.eq('''<InfoText>
+  项目名称: change1
+  单位名称: change2
+  key1: None
+  key2: 123
+  key3: None''')
 
   info1.merge(info2)
-  print(info1)
+  str(info1) | should.eq('''<InfoText>
+  单位名称: change2
+  项目名称: change1
+  key1: None
+  key2: 123
+  key3: 456''')
 
 
 
@@ -322,4 +364,39 @@ def test_figlet():
 def test_mkdir():
   import os
   os.mkdir('33/11/22')
+
+
+
+def test_info_disable_octal_auto_convert_dec():
+  from pyshould import should
+  text = '''
+
+  index1: 1.23
+  index2: 11
+  index_empty:
+  index3: 100
+  # index4: 061   # will convert to 49, for int('61', base=8) = 49
+  index4a: '061'  # will not convert to 49
+
+  '''
+  info = InfoText.from_string(text)
+  print(info.content)
+  str(info) | should.eq("""
+<InfoText>
+  index1: 1.23
+  index2: 11
+  index_empty: None
+  index3: 100
+  index4a: '061'
+""".strip())
+  info.to_yaml_string() | should.eq("""
+index1: 1.23
+index2: 11
+index_empty: None
+index3: 100
+index4a: '061'""")
+
+  # 1 | should.eq(2)
+
+
 

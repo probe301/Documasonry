@@ -1,8 +1,8 @@
 
 
-from pylon import puts
+# from pylon import puts
 import pylon
-import re
+# import re
 import os
 import sys
 import time
@@ -10,10 +10,10 @@ import time
 import html
 import urllib.parse
 import logging
-from filler import Filler
+# from filler import Filler
 from infotext import InfoText
 from documasonry import Documasonry
-from PyQt4 import QtCore, QtGui, uic
+from PyQt4 import QtCore, uic
 from PyQt4.QtGui import (QApplication, QMessageBox, QCheckBox, QFileDialog, QWidget)
 
 
@@ -272,12 +272,11 @@ class DragInArea:
 class DocumasonryGUI(QWidget, QCommonTools, QLogger):
   ''' GUI
 
-  ######   #####   ###### ##   ## ##   ##  #####   ######  #####  ##   ## ######  ##   ##
-  ##   ## ##   ## ###     ##   ## ### ### ##   ## ##      ##   ## ###  ## ##   ## ##   ##
-  ##   ## ##   ## ##      ##   ## ## # ## #######  #####  ##   ## ## # ## ######   #####
-  ##   ## ##   ## ###     ##   ## ##   ## ##   ##      ## ##   ## ##  ### ##  ##     ##
-  ######   #####   ######  #####  ##   ## ##   ## ######   #####  ##   ## ##   ##    ##
-
+  ######   #####   ###### ##   ## ##   ##  #####   ######  #####  ##   ##
+  ##   ## ##   ## ###     ##   ## ### ### ##   ## ##      ##   ## ###  ##
+  ##   ## ##   ## ##      ##   ## ## # ## #######  #####  ##   ## ## # ##
+  ##   ## ##   ## ###     ##   ## ##   ## ##   ##      ## ##   ## ##  ###
+  ######   #####   ######  #####  ##   ## ##   ## ######   #####  ##   ##
   '''
 
   def __init__(self, parent=None):
