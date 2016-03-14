@@ -194,7 +194,11 @@ class InfoText:
     ''' 合并两个info, 未额外处理 key<default>
         other 中的 Value None 不会覆盖 self 中的已有值'''
     # self.content.update(other.content)
-    for k, v in other.content.items():
+    if isinstance(other, dict):
+      other_dict = other
+    if isinstance(other, InfoText):
+      other_dict = other.content
+    for k, v in other_dict.items():
       if k in self.content and v is None:
         continue
       self.content[k] = v
@@ -354,7 +358,7 @@ def test_infotext_merge():
 
 def test_figlet():
   from pylon import generate_figlet
-  text = 'word excel autocad'.split(' ')
+  text = 'word excel autocad table vertex'.split(' ')
   for word in text:
     generate_figlet(word, fonts=['space_op', ])
 
@@ -397,6 +401,5 @@ index3: 100
 index4a: '061'""")
 
   # 1 | should.eq(2)
-
 
 

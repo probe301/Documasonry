@@ -267,8 +267,6 @@ class DragInArea:
 
 
 
-
-
 class DocumasonryGUI(QWidget, QCommonTools, QLogger):
   ''' GUI
 

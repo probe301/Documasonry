@@ -433,6 +433,10 @@ class ExcelFiller:
     for cell in self.field_cells(sheet):
       for match in re.findall(r'{{.+?}}', cell.Value):
         field_names.append(match)
+
+      for match in re.findall(r'{.+?}', cell.Value):
+        field_names.append(match)
+
     for match in re.findall(r'{{.+?}}', sheet.Name):  # sheet name 中的字段
       field_names.append(match)
 
@@ -461,7 +465,7 @@ class ExcelFiller:
           yield cell
 
 
-  def render(self, info):
+  def render(self, info, fill_list=True):
     ''' 填充单元格内普通字段
         填充列表字段
         填充sheet label可能有的字段 '''
@@ -472,7 +476,8 @@ class ExcelFiller:
       cell_string = cell.Value
       cell.Value = evalute_field(cell_string, info)
 
-    self.fill_list_cells(info, sheet) # 填充 list 字段
+    if fill_list:
+      self.fill_list_cells(info, sheet) # 填充 list 字段
     self.fill_sheet_label(info, sheet) # 填充 sheet name
 
 
@@ -481,9 +486,11 @@ class ExcelFiller:
 
 
   def list_cells_max_length(self, sheet, default=10):
-    # 记录在 sheet label 中 list=n
-    # 例如 'Sheet1{#list=15#}'
-    # 可以放在 jinja 风格注释中, 填充后会自动去掉该部分文字, 剩下 'Sheet1'
+    ''' 记录在 sheet label 中 list=n
+        例如 'Sheet1{#list=15#}'
+        可以放在 jinja 风格注释中,
+        填充后会自动去掉该部分文字, 剩下 'Sheet1'
+    '''
     match = re.search(r'(?<=list\=)\d+', sheet.Name)
     if match:
       return int(match.group(0))
@@ -522,10 +529,8 @@ class ExcelFiller:
 
       row = cell.Row
       col = cell.Column
-      span_rows = cell.MergeArea.Rows.Count
-      # 有些坐标是界址点和界址线信息交错排布,
-      # 这时每个 cell 占两行高度, 点线错开一行
       # 使用 cell.MergeArea 判断是否跨行合并过
+      span_rows = cell.MergeArea.Rows.Count
       for elem in value_list:
         sheet.Cells(row, col).Value = elem
         row += span_rows
